@@ -222,6 +222,7 @@ function ComputerViewer(computer) {
     this.computer = computer;
 
     this.canvas = document.getElementById("programCanvas");
+    this.ctx = this.canvas.getContext("2d");
 
     this.drawR = 20;
     this.drawSep = 50;
@@ -236,67 +237,86 @@ ComputerViewer.prototype.getY = function(row) {
     return (this.computer.height - row - 0.5) * this.drawSep;
 }
 
-ComputerViewer.prototype.drawLine = function(ctx, col1, row1, col2, row2) {
-    ctx.beginPath();
-    ctx.moveTo(this.getX(col1), this.getY(row1));
-    ctx.lineTo(this.getX(col2), this.getY(row2));
-    ctx.stroke();
+ComputerViewer.prototype.drawLine = function(x1, y1, x2, y2) {
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
 }
 
-ComputerViewer.prototype.drawProgramPointer = function(ctx) {
-    ctx.strokeStyle = "#008000";
+ComputerViewer.prototype.drawGridLine = function(col1, row1, col2, row2) {
+    this.drawLine(this.getX(col1), this.getY(row1), this.getX(col2), this.getY(row2));
+}
+
+ComputerViewer.prototype.drawProgramPointer = function() {
+    switch (this.computer.status) {
+        case Status.ERROR: this.ctx.strokeStyle = "#FF0000"; break;
+        case Status.RUNNING: this.ctx.strokeStyle = "#008000"; break;
+        case Status.DONE: this.ctx.strokeStyle = "#008000"; break;
+    }
     var x = this.getX(this.computer.pp.col);
     var y = this.getY(this.computer.pp.row);
-    ctx.rect(x - this.ppR, y - this.ppR, this.ppR * 2, this.ppR * 2);
-    ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.rect(x - this.ppR, y - this.ppR, this.ppR * 2, this.ppR * 2);
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = "#D0D000";
+    this.ctx.lineWidth = 3;
+    switch (this.computer.pp.dir) {
+        case Dir.UP: this.drawLine(x - this.ppR, y - this.ppR, x + this.ppR, y - this.ppR); break;
+        case Dir.RIGHT: this.drawLine(x + this.ppR, y - this.ppR, x + this.ppR, y + this.ppR); break;
+        case Dir.DOWN: this.drawLine(x - this.ppR, y + this.ppR, x + this.ppR, y + this.ppR); break;
+        case Dir.LEFT: this.drawLine(x - this.ppR, y - this.ppR, x - this.ppR, y + this.ppR); break;
+    }
+    this.ctx.lineWidth = 1;
 }
 
-ComputerViewer.prototype.drawCircle = function(ctx, col, row, fillColor) {
-    ctx.fillStyle = fillColor;
-    ctx.strokeStyle = "#808080";
+ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
+    this.ctx.fillStyle = fillColor;
+    this.ctx.strokeStyle = "#808080";
 
-    ctx.beginPath();
-    ctx.arc(this.getX(col), this.getY(row), this.drawR, 0, 2 * Math.PI);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.arc(this.getX(col), this.getY(row), this.drawR, 0, 2 * Math.PI);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
 }
 
-ComputerViewer.prototype.drawGrid = function(ctx) {
-    ctx.strokeStyle = "#404040";
+ComputerViewer.prototype.drawGrid = function() {
+    this.ctx.strokeStyle = "#404040";
 
     for (var col = 0; col < this.computer.width; col++) {
-        this.drawLine(ctx, col, 0, col, this.computer.height - 1);
+        this.drawGridLine(col, 0, col, this.computer.height - 1);
     }
 
     for (var row = 0; row < this.computer.height; row++) {
-        this.drawLine(ctx, 0, row, this.computer.width - 1, row);
+        this.drawGridLine(0, row, this.computer.width - 1, row);
     }
 }
 
-ComputerViewer.prototype.drawProgram = function(ctx) {
+ComputerViewer.prototype.drawProgram = function() {
     for (var col = 0; col < this.computer.width; col++) {
         for (var row = 0; row < this.computer.height; row++) {
             var ins = this.computer.getInstruction(col, row);
 
             switch (ins) {
-                case Instruction.DATA: this.drawCircle(ctx, col, row, "#FFFFFF"); break;
-                case Instruction.TURN: this.drawCircle(ctx, col, row, "#000000"); break;
+                case Instruction.DATA: this.drawCircle(col, row, "#FFFFFF"); break;
+                case Instruction.TURN: this.drawCircle(col, row, "#000000"); break;
             }
         }
     }
 }
 
 ComputerViewer.prototype.draw = function() {
-    var ctx = this.canvas.getContext("2d");
-
     // Clear canvas
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    this.drawGrid(ctx);
-    this.drawProgram(ctx);
-    this.drawProgramPointer(ctx);
+    this.drawGrid();
+    this.drawProgram();
+    if (this.computer.status != Status.READY) {
+        this.drawProgramPointer();
+    }
 }
 
 /**
