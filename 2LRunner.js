@@ -19,6 +19,9 @@ var Status = {
 var dx = [0, 1, 0, -1];
 var dy = [1, 0, -1, 0];
 
+var maxRunSpeed = 16;
+var unitRunSpeed = 6;
+
 /**
  * @constructor
  */
@@ -325,6 +328,8 @@ ComputerViewer.prototype.draw = function() {
 function ComputerControl(model, viewer) {
     this.model = model;
     this.viewer = viewer;
+    this.setRunSpeed(4);
+    this.paused = true;
 }
 
 ComputerControl.prototype.step = function() {
@@ -332,9 +337,56 @@ ComputerControl.prototype.step = function() {
     this.viewer.draw();
 }
 
+ComputerControl.prototype.playTick = function() {
+    var numSteps = this.stepsPerTick;
+    while (numSteps-- > 0) {
+        this.step();
+    }
+}
+
 ComputerControl.prototype.reset = function() {
     this.model.reset();
     this.viewer.draw();
+}
+
+ComputerControl.prototype.play = function() {
+    if (this.playId) {
+        clearInterval(this.playId);
+    }
+
+    var me = this;
+    this.playId = setInterval(function() { me.playTick() }, this.stepPeriod * 40);
+}
+
+ComputerControl.prototype.pause = function() {
+    if (this.playId) {
+        clearInterval(this.playId);
+        this.playId = undefined;
+    }
+}
+
+ComputerControl.prototype.setRunSpeed = function(speed) {
+    this.runSpeed = speed;
+    if (speed == 0) {
+        return;
+    }
+
+    if (speed < unitRunSpeed) {
+        this.stepPeriod = 1 << (unitRunSpeed - speed);
+        this.stepsPerTick = 1;
+    } else {
+        this.stepPeriod = 1;
+        this.stepsPerTick = 1 << (speed - unitRunSpeed);
+    }
+
+    if (this.playId) {
+        // Invoke again as schedule interval may have changed
+        this.play();
+    }
+}
+
+ComputerControl.prototype.changeRunSpeed = function(delta) {
+    this.setRunSpeed(Math.min(maxRunSpeed, Math.max(0, this.runSpeed + delta)));
 }
 
 function init() {
