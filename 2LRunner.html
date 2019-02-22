@@ -4,17 +4,52 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>2L Runner</title>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/docs.min.css">
+<style>
+.my-container .row+.row {
+    margin-top:1rem;
+}
+
+.my-container .row>.col,
+.my-container .row>[class^=col-]{
+	padding-top:.25rem;
+	padding-bottom:.25rem;
+}
+</style>
 </head>
 <body>
-<center><canvas id="programCanvas" width="400" height="300"></canvas></center>
-<center>
-<button id="step" onclick="computerControl.step()">Step</button>
-<button id="reset" onclick="computerControl.reset()">Reset</button>
-<button id="play" onclick="computerControl.play()">Play</button>
-<button id="pause" onclick="computerControl.pause()">Pause</button>
-<button id="slower" onclick="computerControl.changeRunSpeed(-1)">Slower</button>
-<button id="faster" onclick="computerControl.changeRunSpeed(1)">Faster</button>
-</center>
+
+<div class="container my-container">
+<div class="row">
+    <div class="col-8">
+        <center><canvas id="programCanvas" width="400" height="300"></canvas></center>
+    </div>
+    <div class="col-4 col-md-2">
+        <div class="row">
+            <div class="col-12">
+                <button id="reset-button" onclick="computerControl.reset()" class="btn btn-primary btn-block">Reset</button>
+            </div>
+            <div class="col-12">
+                <button id="step-button" onclick="computerControl.step()" class="btn btn-primary btn-block">Step</button>
+            </div>
+            <div class="col-12">
+                <button id="play-button" onclick="computerControl.play()" class="btn btn-primary btn-block">Play</button>
+            </div>
+            <div class="col-12">
+                <button id="pause-button" onclick="computerControl.pause()" class="btn btn-primary btn-block">Pause</button>
+            </div>
+            <div class="col-12">
+                <button id="slower-button" onclick="computerControl.changeRunSpeed(-1)" class="btn btn-primary btn-block">Slower</button>
+            </div>
+            <div class="col-12">
+                <button id="faster-button" onclick="computerControl.changeRunSpeed(1)" class="btn btn-primary btn-block">Faster</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
 </body>
 <script src="2LRunner.js"></script>
 </html>

@@ -328,25 +328,41 @@ ComputerViewer.prototype.draw = function() {
 function ComputerControl(model, viewer) {
     this.model = model;
     this.viewer = viewer;
-    this.setRunSpeed(4);
-    this.paused = true;
+    this._setRunSpeed(4);
+    this._update();
+}
+
+ComputerControl.prototype._updateButtons = function() {
+    var runnable = (this.model.status == Status.READY || this.model.status == Status.RUNNING);
+    document.getElementById("reset-button").disabled = (this.model.status == Status.READY);
+    document.getElementById("step-button").disabled = !runnable || this.playId;
+    document.getElementById("play-button").disabled = !runnable || this.playId;
+    document.getElementById("pause-button").disabled = !runnable || !this.playId;
+    document.getElementById("slower-button").disabled = (this.runSpeed == 0);
+    document.getElementById("faster-button").disabled = (this.runSpeed == maxRunSpeed);
+}
+
+ComputerControl.prototype._update = function() {
+    this._updateButtons();
+    this.viewer.draw();
 }
 
 ComputerControl.prototype.step = function() {
     this.model.step();
-    this.viewer.draw();
+    this._update();
 }
 
-ComputerControl.prototype.playTick = function() {
+ComputerControl.prototype._playTick = function() {
     var numSteps = this.stepsPerTick;
     while (numSteps-- > 0) {
-        this.step();
+        this.model.step();
     }
+    this._update();
 }
 
 ComputerControl.prototype.reset = function() {
     this.model.reset();
-    this.viewer.draw();
+    this._update();
 }
 
 ComputerControl.prototype.play = function() {
@@ -355,17 +371,20 @@ ComputerControl.prototype.play = function() {
     }
 
     var me = this;
-    this.playId = setInterval(function() { me.playTick() }, this.stepPeriod * 40);
+    this.playId = setInterval(function() { me._playTick() }, this.stepPeriod * 40);
 }
 
 ComputerControl.prototype.pause = function() {
-    if (this.playId) {
-        clearInterval(this.playId);
-        this.playId = undefined;
+    if (!this.playId) {
+        return;
     }
+
+    clearInterval(this.playId);
+    this.playId = undefined;
+    this._update();
 }
 
-ComputerControl.prototype.setRunSpeed = function(speed) {
+ComputerControl.prototype._setRunSpeed = function(speed) {
     this.runSpeed = speed;
     if (speed == 0) {
         return;
@@ -386,15 +405,15 @@ ComputerControl.prototype.setRunSpeed = function(speed) {
 }
 
 ComputerControl.prototype.changeRunSpeed = function(delta) {
-    this.setRunSpeed(Math.min(maxRunSpeed, Math.max(0, this.runSpeed + delta)));
+    this._setRunSpeed(Math.min(maxRunSpeed, Math.max(0, this.runSpeed + delta)));
+    this._update();
 }
 
 function init() {
     var computer = new Computer(5, 5);
-    var computerViewer = new ComputerViewer(computer);
-
     computer.loadProgram("*_*__o___*o____o*_o_o__*_");
-    computerViewer.draw();
+
+    var computerViewer = new ComputerViewer(computer);
 
     return new ComputerControl(computer, computerViewer);
 }
