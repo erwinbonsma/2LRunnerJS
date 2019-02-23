@@ -766,9 +766,13 @@ ComputerControl.prototype.dump = function() {
 }
 
 function init() {
-    var program = programs.BB_7x7_1842682;
-    var computer = new Computer(program.w, program.h, 4096);
-    computer.loadProgram(program.program);
+    const urlParams = new URLSearchParams(window.location.search);
+    const w = urlParams.get('w') || 5;
+    const h = urlParams.get('h') || 5;
+    const program = urlParams.get('p') || "*_*__o___*o____o*_o_o__*_";
+
+    var computer = new Computer(w, h, 4096);
+    computer.loadProgram(program);
 
     return new ComputerControl(computer);
 }
