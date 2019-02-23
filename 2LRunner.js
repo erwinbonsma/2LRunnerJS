@@ -117,6 +117,23 @@ Data.prototype.shl = function() {
     return true;
 }
 
+Data.prototype.toString = function() {
+    var s = "";
+    var i = this.minBound;
+    while (i <= this.maxBound) {
+        if (s != "") {
+            s += ",";
+        }
+        if (i == this.dp) {
+            s += "[" + this.data[i] + "]";
+        } else {
+            s += this.data[i];
+        }
+        i++;
+    }
+    return s;
+}
+
 /**
  * @constructor
  */
@@ -467,6 +484,10 @@ ComputerControl.prototype._setRunSpeed = function(speed) {
 ComputerControl.prototype.changeRunSpeed = function(delta) {
     this._setRunSpeed(Math.min(maxRunSpeed, Math.max(0, this.runSpeed + delta)));
     this._update();
+}
+
+ComputerControl.prototype.dump = function() {
+    console.log("data = " + this.model.data.toString());
 }
 
 function init() {
