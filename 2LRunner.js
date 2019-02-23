@@ -269,15 +269,19 @@ DataViewer.prototype._setColor = function(activeValue) {
     this.ctx.fillStyle = style;
 }
 
-DataViewer.prototype.draw = function() {
-    // Clear canvas
-    this.ctx.fillStyle = "#FFFFFF";
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+DataViewer.prototype._drawValuesDec = function(x, i) {
+    while (x > 0) {
+        var value = this.data.valueAt(i);
+        this._setColor(i == this.data.dp);
+        x -= this.ctx.measureText(value).width + 8;
+        this.ctx.fillText(value, x, 20);
+        i--;
+    }
+}
 
+DataViewer.prototype._drawValuesInc = function(x, i) {
     var w = this.canvas.width;
-    var x = 0;
-    var i = this.data.minBound;
-    
+
     while (x < w) {
         var value = this.data.valueAt(i);
         this._setColor(i == this.data.dp);
@@ -285,6 +289,18 @@ DataViewer.prototype.draw = function() {
         x += this.ctx.measureText(value).width + 8;
         i++;
     }
+}
+
+DataViewer.prototype.draw = function() {
+    // Clear canvas
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    var value = this.data.valueAt(this.data.dp);
+    var x = (this.canvas.width - this.ctx.measureText(value).width) / 2;
+
+    this._drawValuesInc(x, this.data.dp);
+    this._drawValuesDec(x, this.data.dp - 1);
 }
 
 /**
