@@ -269,25 +269,21 @@ DataViewer.prototype._setColor = function(activeValue) {
     this.ctx.fillStyle = style;
 }
 
-DataViewer.prototype._drawValuesDec = function(x, i) {
-    while (x > 0) {
-        var value = this.data.valueAt(i);
-        this._setColor(i == this.data.dp);
-        x -= this.ctx.measureText(value).width + 8;
-        this.ctx.fillText(value, x, 20);
-        i--;
-    }
-}
-
-DataViewer.prototype._drawValuesInc = function(x, i) {
+DataViewer.prototype._drawValues = function(x, i, inc) {
     var w = this.canvas.width;
 
-    while (x < w) {
+    while (x > 0 && x < w) {
         var value = this.data.valueAt(i);
+        var xdelta = this.ctx.measureText(value).width + 8;
         this._setColor(i == this.data.dp);
+        if (inc < 0) {
+            x -= xdelta;
+        }
         this.ctx.fillText(value, x, 20);
-        x += this.ctx.measureText(value).width + 8;
-        i++;
+        if (inc > 0) {
+            x += xdelta;
+        }
+        i += inc;
     }
 }
 
@@ -299,8 +295,8 @@ DataViewer.prototype.draw = function() {
     var value = this.data.valueAt(this.data.dp);
     var x = (this.canvas.width - this.ctx.measureText(value).width) / 2;
 
-    this._drawValuesInc(x, this.data.dp);
-    this._drawValuesDec(x, this.data.dp - 1);
+    this._drawValues(x, this.data.dp, 1);
+    this._drawValues(x, this.data.dp - 1, -1);
 }
 
 /**
