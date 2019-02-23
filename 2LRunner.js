@@ -348,8 +348,14 @@ ComputerControl.prototype._updateButtons = function() {
     document.getElementById("faster-button").disabled = (this.runSpeed == maxRunSpeed);
 }
 
+
+ComputerControl.prototype._updateStatus = function() {
+    document.getElementById("status").innerHTML = "Steps = " + this.model.numSteps;
+}
+
 ComputerControl.prototype._update = function() {
     this._updateButtons();
+    this._updateStatus();
     this.viewer.draw();
 }
 
