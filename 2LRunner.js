@@ -59,6 +59,10 @@ ProgramPointer.prototype.toString = function() {
  */
 function Data(size) {
     this.size = size;
+    this.reset();
+}
+
+Data.prototype.reset = function() {
     this.minBound = 0;
     this.maxBound = 0;
     this.data = [];
@@ -68,6 +72,13 @@ function Data(size) {
 
 Data.prototype.value = function() {
     return this.data[this.dp];
+}
+
+Data.prototype.valueAt = function(index) {
+    if (index < this.minBound || index > this.maxBound) {
+        return 0;
+    }
+    return this.data[index];
 }
 
 Data.prototype.inc = function() {
@@ -112,7 +123,7 @@ Data.prototype.shl = function() {
 function Computer(width, height, datasize) {
     this.width = width;
     this.height = height;
-    this.datasize = datasize;
+    this.data = new Data(datasize);
 
     this.program = [];
     for (var col = 0; col < width; col++) {
@@ -126,7 +137,7 @@ function Computer(width, height, datasize) {
 }
 
 Computer.prototype.reset = function() {
-    this.data = new Data(this.datasize);
+    this.data.reset();
     this.pp = new ProgramPointer();
     this.status = Status.READY;
     this.numSteps = 0;
@@ -222,6 +233,41 @@ Computer.prototype.step = function(col, row) {
     this.pp.col = col;
     this.pp.row = row;
     this.numSteps++;
+}
+
+/**
+ * @constructor
+ */
+function DataViewer(data) {
+    this.data = data;
+
+    this.canvas = document.getElementById("dataCanvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.ctx.font = "24px Arial";
+}
+
+DataViewer.prototype._setColor = function(activeValue) {
+    var style = activeValue ? "#00FF00" : "#008000";
+    this.ctx.strokeStyle = style;
+    this.ctx.fillStyle = style;
+}
+
+DataViewer.prototype.draw = function() {
+    // Clear canvas
+    this.ctx.fillStyle = "#FFFFFF";
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    var w = this.canvas.width;
+    var x = 0;
+    var i = this.data.minBound;
+    
+    while (x < w) {
+        var value = this.data.valueAt(i);
+        this._setColor(i == this.data.dp);
+        this.ctx.fillText(value, x, 20);
+        x += this.ctx.measureText(value).width + 8;
+        i++;
+    }
 }
 
 /**
@@ -331,9 +377,10 @@ ComputerViewer.prototype.draw = function() {
 /**
  * @constructor
  */
-function ComputerControl(model, viewer) {
+function ComputerControl(model) {
     this.model = model;
-    this.viewer = viewer;
+    this.viewer = new ComputerViewer(model);
+    this.dataViewer = new DataViewer(model.data);
     this._setRunSpeed(4);
     this._update();
 }
@@ -357,6 +404,7 @@ ComputerControl.prototype._update = function() {
     this._updateButtons();
     this._updateStatus();
     this.viewer.draw();
+    this.dataViewer.draw();
 }
 
 ComputerControl.prototype.step = function() {
@@ -426,9 +474,7 @@ function init() {
     var computer = new Computer(program.w, program.h, 4096);
     computer.loadProgram(program.program);
 
-    var computerViewer = new ComputerViewer(computer);
-
-    return new ComputerControl(computer, computerViewer);
+    return new ComputerControl(computer);
 }
 
 var computerControl = init();
