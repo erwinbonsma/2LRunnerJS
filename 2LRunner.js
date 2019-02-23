@@ -19,8 +19,14 @@ var Status = {
 var dx = [0, 1, 0, -1];
 var dy = [1, 0, -1, 0];
 
-var maxRunSpeed = 16;
+var maxRunSpeed = 20;
 var unitRunSpeed = 6;
+
+var programs = {
+    Loop_5x5: { w: 5, h: 5, program: "*_*__o___*o____o*_o_o__*_" },
+    BB_7x7_342959: { w: 7, h: 7, program: "_**____*oo__*___o**_*_*oooo**__oo_**_*o_o*o___o*_" },
+    BB_7x7_1842682: { w: 7, h: 7, program: "__*_____*o__*__*oo__*__o**o_*_oooo**o**___oo*__*_" }
+};
 
 /**
  * @constructor
@@ -75,7 +81,7 @@ Data.prototype.dec= function() {
 Data.prototype.shr = function() {
     this.dp++;
     if (this.dp > this.maxBound) {
-        if (this.maxBound - this.minBound < size) {
+        if (this.maxBound - this.minBound < this.size) {
             this.maxBound = this.dp;
             this.data[this.dp] = 0;
         } else {
@@ -89,7 +95,7 @@ Data.prototype.shr = function() {
 Data.prototype.shl = function() {
     this.dp--;
     if (this.dp < this.minBound) {
-        if (this.maxBound - this.minBound < size) {
+        if (this.maxBound - this.minBound < this.size) {
             this.minBound = this.dp;
             this.data[this.dp] = 0;
         } else {
@@ -227,9 +233,9 @@ function ComputerViewer(computer) {
     this.canvas = document.getElementById("programCanvas");
     this.ctx = this.canvas.getContext("2d");
 
-    this.drawR = 20;
-    this.drawSep = 50;
-    this.ppR = 24;
+    this.drawR = 12;
+    this.drawSep = 32;
+    this.ppR = 14;
 }
 
 ComputerViewer.prototype.getX = function(col) {
@@ -410,8 +416,9 @@ ComputerControl.prototype.changeRunSpeed = function(delta) {
 }
 
 function init() {
-    var computer = new Computer(5, 5);
-    computer.loadProgram("*_*__o___*o____o*_o_o__*_");
+    var program = programs.BB_7x7_342959;
+    var computer = new Computer(program.w, program.h, 4096);
+    computer.loadProgram(program.program);
 
     var computerViewer = new ComputerViewer(computer);
 
