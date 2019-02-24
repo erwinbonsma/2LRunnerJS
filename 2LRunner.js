@@ -1,32 +1,37 @@
-var Instruction = {
+const Instruction = {
     NOOP: 0,
     DATA: 1,
     TURN: 2,
     DONE: 3
 };
-var Dir = {
+const Dir = {
     UP: 0,
     RIGHT: 1,
     DOWN: 2,
     LEFT: 3
 };
-var Status = {
+const Status = {
     READY: 0,
     RUNNING: 1,
     DONE: 2,
     ERROR: 3
 };
-var dx = [0, 1, 0, -1];
-var dy = [1, 0, -1, 0];
+const dx = [0, 1, 0, -1];
+const dy = [1, 0, -1, 0];
 
-var maxRunSpeed = 20;
-var unitRunSpeed = 6;
+const maxRunSpeed = 20;
+const unitRunSpeed = 6;
 
-var programs = {
+const programs = {
     Loop_5x5: { w: 5, h: 5, program: "*_*__o___*o____o*_o_o__*_" },
     BB_7x7_342959: { w: 7, h: 7, program: "_**____*oo__*___o**_*_*oooo**__oo_**_*o_o*o___o*_" },
     BB_7x7_1842682: { w: 7, h: 7, program: "__*_____*o__*__*oo__*__o**o_*_oooo**o**___oo*__*_" }
 };
+
+const numHeatmapColors = 8;
+const heatmapColors = [
+    "#0000FF", "#6A00FF", "#D500FF", "#FF00BD", "#FF0052", "#FF1800", "#FF8300", "#FFED00"
+];
 
 /**
  * @constructor
@@ -276,6 +281,14 @@ PathTracker.prototype.rankForVisitCount = function(count) {
     }
 
     console.log("Did not find bucket for count = " + count);
+}
+
+PathTracker.prototype.colorForVisitCount = function(count) {
+    var rank = this.rankForVisitCount(count);
+    if (rank >= numHeatmapColors) {
+        rank = numHeatmapColors - 1;
+    }
+    return heatmapColors[rank];
 }
 
 PathTracker.prototype.dump = function() {
@@ -565,7 +578,7 @@ ComputerViewer.prototype.drawProgramPointer = function() {
 
 ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
     this.ctx.fillStyle = fillColor;
-    this.ctx.strokeStyle = "#808080";
+    this.ctx.strokeStyle = "#404040";
 
     this.ctx.beginPath();
     this.ctx.arc(this.getX(col), this.getY(row), this.drawR, 0, 2 * Math.PI);
@@ -575,6 +588,7 @@ ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
 }
 
 ComputerViewer.prototype.drawGrid = function() {
+    this.ctx.lineWidth = 0.5;
     this.ctx.strokeStyle = "#404040";
 
     for (var col = 0; col < this.computer.width; col++) {
@@ -584,26 +598,29 @@ ComputerViewer.prototype.drawGrid = function() {
     for (var row = 0; row < this.computer.height; row++) {
         this.drawGridLine(0, row, this.computer.width - 1, row);
     }
+
+    this.ctx.lineWidth = 1;
 }
 
 ComputerViewer.prototype.drawPaths = function() {
     var tracker = this.computer.pathTracker;
     var count;
 
-    this.ctx.strokeStyle = "#0000FF";
-    this.ctx.lineWidth = 3;
+    this.ctx.lineWidth = 2;
     
     for (var x = 0; x < this.computer.width; x++) {
         for (var y = 0; y < this.computer.height; y++) {
             if (x < this.computer.width - 1) {
                 count = tracker.getHorizontalVisitCount(x, y);
                 if (count > 0) {
+                    this.ctx.strokeStyle = tracker.colorForVisitCount(count);
                     this.drawGridLine(x, y, x + 1, y);
                 }
             }
             if (y < this.computer.height - 1) {
                 count = tracker.getVerticalVisitCount(x, y);
                 if (count > 0) {
+                    this.ctx.strokeStyle = tracker.colorForVisitCount(count);
                     this.drawGridLine(x, y, x, y + 1);
                 }
             }
