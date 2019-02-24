@@ -678,7 +678,7 @@ ComputerControl.prototype._updateButtons = function() {
     document.getElementById("reset-button").disabled = (this.model.status == Status.READY);
     document.getElementById("step-button").disabled = !runnable || !this.paused;
     document.getElementById("play-button").disabled = !runnable || !this.paused;
-    document.getElementById("pause-button").disabled = !runnable || this.paused;
+    document.getElementById("pause-button").disabled = this.paused;
     document.getElementById("slower-button").disabled = (this.runSpeed == 0);
     document.getElementById("faster-button").disabled = (this.runSpeed == maxRunSpeed);
 }
