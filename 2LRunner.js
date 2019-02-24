@@ -260,7 +260,12 @@ function DataViewer(data) {
 
     this.canvas = document.getElementById("dataCanvas");
     this.ctx = this.canvas.getContext("2d");
+
     this.ctx.font = "24px Arial";
+    this.valueSep = 8;
+
+    this.desiredCenterAddress = 0;
+    this.deltaToDesired = 0;
 }
 
 DataViewer.prototype._setColor = function(activeValue) {
@@ -269,17 +274,42 @@ DataViewer.prototype._setColor = function(activeValue) {
     this.ctx.fillStyle = style;
 }
 
+DataViewer.prototype._widthOfValueAt = function(address) {
+    return this.ctx.measureText(this.data.valueAt(address)).width;
+}
+
+DataViewer.prototype._adjustDeltaToDesired = function(newDesiredCenterAddress) {
+    var delta = newDesiredCenterAddress > this.desiredCenterAddress ? 1 : -1;
+
+    var shift = 0;
+    var i = this.desiredCenterAddress;
+    shift += this._widthOfValueAt(i) / 2;
+    shift += this.valueSep;
+    i += delta;
+
+    // We may skip several addresses
+    while (i != newDesiredCenterAddress) {
+        shift += this._widthOfValueAt(i);
+        shift += this.valueSep;
+        i += delta;
+    }
+
+    shift += this._widthOfValueAt(i) / 2;
+
+    this.deltaToDesired += delta * shift;
+    this.desiredCenterAddress = newDesiredCenterAddress;
+}
+
 DataViewer.prototype._drawValues = function(x, i, inc) {
     var w = this.canvas.width;
 
-    while (x > 0 && x < w) {
-        var value = this.data.valueAt(i);
-        var xdelta = this.ctx.measureText(value).width + 8;
+    while ((inc < 0 && x >= 0) || (inc > 0 && x < w)) {
+        var xdelta = this._widthOfValueAt(i) + this.valueSep;
         this._setColor(i == this.data.dp);
         if (inc < 0) {
             x -= xdelta;
         }
-        this.ctx.fillText(value, x, 20);
+        this.ctx.fillText(this.data.valueAt(i), x, 20);
         if (inc > 0) {
             x += xdelta;
         }
@@ -292,8 +322,23 @@ DataViewer.prototype.draw = function() {
     this.ctx.fillStyle = "#FFFFFF";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    var value = this.data.valueAt(this.data.dp);
-    var x = (this.canvas.width - this.ctx.measureText(value).width) / 2;
+    if (this.data.dp != this.desiredCenterAddress) {
+        this._adjustDeltaToDesired(this.data.dp);
+    }
+    else if (this.deltaToDesired != 0) {
+        this.deltaToDesired = (this.deltaToDesired * 4) / 5;
+    }
+
+    var w = this._widthOfValueAt(this.desiredCenterAddress);
+    var x = (this.canvas.width - w) / 2;
+    
+    if (this.deltaToDesired > this.canvas.width / 2) {
+        this.deltaToDesired = this.canvas.width / 2;
+    }
+    else if (this.deltaToDesired < -this.canvas.width / 2) {
+        this.deltaToDesired = -this.canvas.width / 2;
+    }
+    x += this.deltaToDesired;
 
     this._drawValues(x, this.data.dp, 1);
     this._drawValues(x, this.data.dp - 1, -1);
@@ -410,20 +455,25 @@ function ComputerControl(model) {
     this.model = model;
     this.viewer = new ComputerViewer(model);
     this.dataViewer = new DataViewer(model.data);
+
+    this.paused = true;
+    this.numUpdatesSinceLastPlay = 0;
+
     this._setRunSpeed(4);
-    this._update();
+
+    var me = this;
+    this.updateId = setInterval(function() { me._update() }, 40);
 }
 
 ComputerControl.prototype._updateButtons = function() {
     var runnable = (this.model.status == Status.READY || this.model.status == Status.RUNNING);
     document.getElementById("reset-button").disabled = (this.model.status == Status.READY);
-    document.getElementById("step-button").disabled = !runnable || this.playId;
-    document.getElementById("play-button").disabled = !runnable || this.playId;
-    document.getElementById("pause-button").disabled = !runnable || !this.playId;
+    document.getElementById("step-button").disabled = !runnable || !this.paused;
+    document.getElementById("play-button").disabled = !runnable || !this.paused;
+    document.getElementById("pause-button").disabled = !runnable || this.paused;
     document.getElementById("slower-button").disabled = (this.runSpeed == 0);
     document.getElementById("faster-button").disabled = (this.runSpeed == maxRunSpeed);
 }
-
 
 ComputerControl.prototype._updateStatus = function() {
     document.getElementById("status").innerHTML = "Steps = " + this.model.numSteps;
@@ -434,62 +484,47 @@ ComputerControl.prototype._update = function() {
     this._updateStatus();
     this.viewer.draw();
     this.dataViewer.draw();
+
+    if (!this.paused) {
+        if (++this.numUpdatesSinceLastPlay >= this.playPeriod) {
+            this._playTick();
+            this.numUpdatesSinceLastPlay = 0;
+        }
+    }
 }
 
 ComputerControl.prototype.step = function() {
     this.model.step();
-    this._update();
 }
 
 ComputerControl.prototype._playTick = function() {
-    var numSteps = this.stepsPerTick;
+    var numSteps = this.stepsPerPlay;
     while (numSteps-- > 0) {
         this.model.step();
     }
-    this._update();
 }
 
 ComputerControl.prototype.reset = function() {
     this.model.reset();
-    this._update();
 }
 
 ComputerControl.prototype.play = function() {
-    if (this.playId) {
-        clearInterval(this.playId);
-    }
-
-    var me = this;
-    this.playId = setInterval(function() { me._playTick() }, this.stepPeriod * 40);
+    this.paused = false;
 }
 
 ComputerControl.prototype.pause = function() {
-    if (!this.playId) {
-        return;
-    }
-
-    clearInterval(this.playId);
-    this.playId = undefined;
-    this._update();
+    this.paused = true;
 }
 
 ComputerControl.prototype._setRunSpeed = function(speed) {
     this.runSpeed = speed;
-    if (speed == 0) {
-        return;
-    }
 
     if (speed < unitRunSpeed) {
-        this.stepPeriod = 1 << (unitRunSpeed - speed);
-        this.stepsPerTick = 1;
+        this.playPeriod = 1 << (unitRunSpeed - speed);
+        this.stepsPerPlay = 1;
     } else {
-        this.stepPeriod = 1;
-        this.stepsPerTick = 1 << (speed - unitRunSpeed);
-    }
-
-    if (this.playId) {
-        // Invoke again as schedule interval may have changed
-        this.play();
+        this.playPeriod = 1;
+        this.stepsPerPlay = 1 << (speed - unitRunSpeed);
     }
 }
 
@@ -503,7 +538,7 @@ ComputerControl.prototype.dump = function() {
 }
 
 function init() {
-    var program = programs.BB_7x7_342959;
+    var program = programs.BB_7x7_1842682;
     var computer = new Computer(program.w, program.h, 4096);
     computer.loadProgram(program.program);
 
