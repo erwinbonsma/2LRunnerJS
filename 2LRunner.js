@@ -137,10 +137,67 @@ Data.prototype.toString = function() {
 /**
  * @constructor
  */
+function PathTracker(width, height) {
+    this.width = width;
+    this.height = height;
+    this.horizontalCounts = [];
+    this.verticalCounts = [];
+    
+    for (var x = 0; x < width; x++) {
+        if (x < width - 1) {
+            this.horizontalCounts[x] = [];
+        }
+        this.verticalCounts[x] = [];
+    }
+    
+    this.reset();
+}
+
+PathTracker.prototype.reset = function() {
+    for (var x = 0; x < this.width; x++) {
+        for (var y = 0; y < this.height; y++) {
+            if (x < this.width - 1) {
+                this.horizontalCounts[x][y] = 0;
+            }
+            if (y < this.height - 1) {
+                this.verticalCounts[x][y] = 0;
+            }
+        }
+    }
+}
+
+// Invoke just before moving pp one step in current direction.
+PathTracker.prototype.trackMoveStep = function(pp) {
+    switch(pp.dir) {
+        case Dir.UP: this.verticalCounts[pp.col][pp.row]++; break;
+        case Dir.DOWN: this.verticalCounts[pp.col][pp.row - 1]++; break;
+        case Dir.RIGHT: this.horizontalCounts[pp.col][pp.row]++; break;
+        case Dir.LEFT: this.horizontalCounts[pp.col - 1][pp.row]++; break;
+    }
+}
+
+PathTracker.prototype.getHorizontalVisitCount = function(x, y) {
+    return this.horizontalCounts[x][y];
+}
+
+PathTracker.prototype.getVerticalVisitCount = function(x, y) {
+    return this.verticalCounts[x][y];
+}
+
+PathTracker.prototype.rankVisitCounts = function() {
+}
+
+PathTracker.prototype.getColorForVisitCount = function(count) {
+}
+
+/**
+ * @constructor
+ */
 function Computer(width, height, datasize) {
     this.width = width;
     this.height = height;
     this.data = new Data(datasize);
+    this.pathTracker = new PathTracker(width, height);
 
     this.program = [];
     for (var col = 0; col < width; col++) {
@@ -155,6 +212,7 @@ function Computer(width, height, datasize) {
 
 Computer.prototype.reset = function() {
     this.data.reset();
+    this.pathTracker.reset();
     this.pp = new ProgramPointer();
     this.status = Status.READY;
     this.numSteps = 0;
@@ -247,6 +305,10 @@ Computer.prototype.step = function(col, row) {
         }
     } while (instruction == Instruction.TURN);
 
+    if (this.status != Status.DONE && this.numSteps > 0) {
+        // Do not count first and last step, as they are out of bounds
+        this.pathTracker.trackMoveStep(this.pp);
+    }
     this.pp.col = col;
     this.pp.row = row;
     this.numSteps++;
@@ -423,6 +485,33 @@ ComputerViewer.prototype.drawGrid = function() {
     }
 }
 
+ComputerViewer.prototype.drawPaths = function() {
+    var tracker = this.computer.pathTracker;
+    var count;
+
+    this.ctx.strokeStyle = "#0000FF";
+    this.ctx.lineWidth = 3;
+    
+    for (var x = 0; x < this.computer.width; x++) {
+        for (var y = 0; y < this.computer.height; y++) {
+            if (x < this.computer.width - 1) {
+                count = tracker.getHorizontalVisitCount(x, y);
+                if (count > 0) {
+                    this.drawGridLine(x, y, x + 1, y);
+                }
+            }
+            if (y < this.computer.height - 1) {
+                count = tracker.getVerticalVisitCount(x, y);
+                if (count > 0) {
+                    this.drawGridLine(x, y, x, y + 1);
+                }
+            }
+        }
+    }
+
+    this.ctx.lineWidth = 1;
+}
+
 ComputerViewer.prototype.drawProgram = function() {
     for (var col = 0; col < this.computer.width; col++) {
         for (var row = 0; row < this.computer.height; row++) {
@@ -442,6 +531,7 @@ ComputerViewer.prototype.draw = function() {
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.drawGrid();
+    this.drawPaths();
     this.drawProgram();
     if (this.computer.status != Status.READY) {
         this.drawProgramPointer();
