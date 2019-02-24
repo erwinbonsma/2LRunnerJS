@@ -137,6 +137,15 @@ Data.prototype.toString = function() {
 /**
  * @constructor
  */
+function RangeBucket(value) {
+    this.minRange = value;
+    this.maxRange = value;
+    this.count = 1;
+}
+
+/**
+ * @constructor
+ */
 function PathTracker(width, height) {
     this.width = width;
     this.height = height;
@@ -144,9 +153,7 @@ function PathTracker(width, height) {
     this.verticalCounts = [];
     
     for (var x = 0; x < width; x++) {
-        if (x < width - 1) {
-            this.horizontalCounts[x] = [];
-        }
+        this.horizontalCounts[x] = [];
         this.verticalCounts[x] = [];
     }
     
@@ -156,12 +163,8 @@ function PathTracker(width, height) {
 PathTracker.prototype.reset = function() {
     for (var x = 0; x < this.width; x++) {
         for (var y = 0; y < this.height; y++) {
-            if (x < this.width - 1) {
-                this.horizontalCounts[x][y] = 0;
-            }
-            if (y < this.height - 1) {
-                this.verticalCounts[x][y] = 0;
-            }
+            this.horizontalCounts[x][y] = 0;
+            this.verticalCounts[x][y] = 0;
         }
     }
 }
@@ -184,10 +187,108 @@ PathTracker.prototype.getVerticalVisitCount = function(x, y) {
     return this.verticalCounts[x][y];
 }
 
-PathTracker.prototype.rankVisitCounts = function() {
+PathTracker.prototype._registerVisitCount = function(count) {
+    if (count == 0) {
+        return;
+    }
+
+    var bucket = this.buckets;
+    var prev = undefined;
+
+    while (bucket && bucket.maxRange < count) {
+        prev = bucket;
+        bucket = bucket.next;
+    }
+
+    if (bucket && bucket.minRange <= count) {
+        // Count falls inside existing bucket
+        bucket.count += 1;
+        return;
+    }
+    if (bucket && count == bucket.minRange - 1) {
+        // Count falls inside existing bucket by expanding minRange by one
+        bucket.count += 1;
+        bucket.minRange = count;
+        return;
+    }
+    if (bucket && count == bucket.maxRange + 1) {
+        // Count falls inside existing bucket by expanding maxRange by one
+        bucket.count += 1;
+        bucket.maxRange = count;
+        return;
+    }
+
+    // Need to create a new bucket
+    var newBucket = new RangeBucket(count);
+    this.numBuckets++;
+
+    if (prev) {
+        prev.next = newBucket;
+    } else {
+        this.buckets = newBucket;
+    }
+    newBucket.next = bucket;
 }
 
-PathTracker.prototype.getColorForVisitCount = function(count) {
+PathTracker.prototype._collapseBuckets = function() {
+    var bucket = this.buckets;
+    var prev = undefined;
+
+    while (bucket) {
+        if (prev && bucket.minRange - prev.maxRange <= 1) {
+            // Bucket ranges touch (or overlap), so join them
+            prev.maxRange = bucket.maxRange;
+            prev.count += bucket.count;
+            prev.next = bucket.next;
+
+            this.numBuckets--;
+        } else {
+            prev = bucket;
+        }
+        bucket = bucket.next;
+    }
+}
+
+PathTracker.prototype.rankVisitCounts = function() {
+    this.numBuckets = 0;
+    this.buckets = undefined;
+
+    for (var x = 0; x < this.width; x++) {
+        for (var y = 0; y < this.height; y++) {
+            this._registerVisitCount(this.horizontalCounts[x][y]);
+            this._registerVisitCount(this.verticalCounts[x][y]);
+        }
+    }
+
+    this._collapseBuckets();
+}
+
+PathTracker.prototype.rankForVisitCount = function(count) {
+    var bucket = this.buckets;
+    var rank = 0;
+
+    while (bucket) {
+        if (count >= bucket.minRange && count <= bucket.maxRange) {
+            return rank;
+        }
+        rank++;
+        bucket = bucket.next;
+    }
+
+    console.log("Did not find bucket for count = " + count);
+}
+
+PathTracker.prototype.dump = function() {
+    var bucket = this.buckets;
+    var s = "";
+    while (bucket) {
+        if (s.length > 0) {
+            s += " ";
+        }
+        s += bucket.minRange + "-" + bucket.maxRange + "(" + bucket.count + ")";
+        bucket = bucket.next;
+    }
+    console.log(s);
 }
 
 /**
@@ -585,6 +686,7 @@ ComputerControl.prototype._update = function() {
 
 ComputerControl.prototype.step = function() {
     this.model.step();
+    this.model.pathTracker.rankVisitCounts();
 }
 
 ComputerControl.prototype._playTick = function() {
@@ -592,6 +694,7 @@ ComputerControl.prototype._playTick = function() {
     while (numSteps-- > 0) {
         this.model.step();
     }
+    this.model.pathTracker.rankVisitCounts();
 }
 
 ComputerControl.prototype.reset = function() {
@@ -625,6 +728,7 @@ ComputerControl.prototype.changeRunSpeed = function(delta) {
 
 ComputerControl.prototype.dump = function() {
     console.log("data = " + this.model.data.toString());
+    this.model.pathTracker.dump();
 }
 
 function init() {
