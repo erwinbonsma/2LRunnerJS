@@ -728,6 +728,7 @@ ComputerControl.prototype._playTick = function() {
 
 ComputerControl.prototype.reset = function() {
     this.model.reset();
+    this.paused = true;
 }
 
 ComputerControl.prototype.play = function() {
