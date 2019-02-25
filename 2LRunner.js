@@ -445,7 +445,7 @@ function DataViewer(data) {
 }
 
 DataViewer.prototype._setColor = function(activeValue) {
-    var style = activeValue ? "#00FF00" : "#008000";
+    var style = activeValue ? "#000000" : "#B0B0B0";
     this.ctx.strokeStyle = style;
     this.ctx.fillStyle = style;
 }
@@ -568,12 +568,13 @@ ComputerViewer.prototype.drawProgramPointer = function() {
     }
     var x = this.getX(this.computer.pp.col);
     var y = this.getY(this.computer.pp.row);
+    this.ctx.lineWidth = 2;
     this.ctx.beginPath();
     this.ctx.rect(x - this.ppR, y - this.ppR, this.ppR * 2, this.ppR * 2);
     this.ctx.stroke();
 
-    this.ctx.strokeStyle = "#D0D000";
-    this.ctx.lineWidth = 3;
+    this.ctx.strokeStyle = "#00D000";
+    this.ctx.lineWidth = 2;
     switch (this.computer.pp.dir) {
         case Dir.UP: this.drawLine(x - this.ppR, y - this.ppR, x + this.ppR, y - this.ppR); break;
         case Dir.RIGHT: this.drawLine(x + this.ppR, y - this.ppR, x + this.ppR, y + this.ppR); break;
@@ -596,7 +597,7 @@ ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
 
 ComputerViewer.prototype.drawGrid = function() {
     this.ctx.lineWidth = 1
-    this.ctx.strokeStyle = "#D0D0D0";
+    this.ctx.strokeStyle = "#808080";
 
     for (var col = 0; col < this.computer.width; col++) {
         this.drawGridLine(col, 0, col, this.computer.height - 1);
@@ -657,7 +658,7 @@ ComputerViewer.prototype.drawNumSteps = function() {
     this.ctx.fillStyle = "#000000";
     var s = this.computer.numSteps;
     var w = this.ctx.measureText(s).width;
-    this.ctx.fillText(s, this.canvas.width - w - 2, 14);
+    this.ctx.fillText(s, this.canvas.width - w, this.canvas.height);
 }
 
 ComputerViewer.prototype.draw = function() {
@@ -670,8 +671,8 @@ ComputerViewer.prototype.draw = function() {
     this.drawProgram();
     if (this.computer.status != Status.READY) {
         this.drawProgramPointer();
+       this.drawNumSteps();
     }
-    this.drawNumSteps();
 }
 
 /**
