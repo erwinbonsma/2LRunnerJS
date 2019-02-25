@@ -20,7 +20,7 @@ const dx = [0, 1, 0, -1];
 const dy = [1, 0, -1, 0];
 
 const maxRunSpeed = 20;
-const unitRunSpeed = 6;
+const unitRunSpeed = 5;
 
 const programs = {
     Loop_5x5: { w: 5, h: 5, program: "*_*__o___*o____o*_o_o__*_" },
@@ -30,7 +30,7 @@ const programs = {
 
 const numHeatmapColors = 8;
 const heatmapColors = [
-    "#0000FF", "#6A00FF", "#D500FF", "#FF00BD", "#FF0052", "#FF1800", "#FF8300", "#FFED00"
+    "#0000FF", "#6A00FF", "#D500FF", "#FF00BD", "#FF0052", "#FF1800", "#FF8300", "#FFFF00"
 ];
 
 /**
@@ -437,8 +437,8 @@ function DataViewer(data) {
     this.canvas = document.getElementById("dataCanvas");
     this.ctx = this.canvas.getContext("2d");
 
-    this.ctx.font = "24px Arial";
-    this.valueSep = 8;
+    this.ctx.font = "14px Arial";
+    this.valueSep = 6;
 
     this.desiredCenterAddress = 0;
     this.deltaToDesired = 0;
@@ -529,17 +529,24 @@ function ComputerViewer(computer) {
     this.canvas = document.getElementById("programCanvas");
     this.ctx = this.canvas.getContext("2d");
 
-    this.drawR = 12;
-    this.drawSep = 32;
-    this.ppR = 14;
+    this.calculateScale();
+}
+
+ComputerViewer.prototype.calculateScale = function() {
+    var hsep = this.canvas.width / (this.computer.width + 1);
+    var vsep = this.canvas.height / (this.computer.height + 1);
+
+    this.drawSep = (hsep < vsep) ? hsep : vsep;
+    this.drawR = 0.4 * this.drawSep;
+    this.ppR = 0.45 * this.drawSep;
 }
 
 ComputerViewer.prototype.getX = function(col) {
-    return (col + 0.5) * this.drawSep;
+    return (col + 1) * this.drawSep;
 }
 
 ComputerViewer.prototype.getY = function(row) {
-    return (this.computer.height - row - 0.5) * this.drawSep;
+    return (this.computer.height - row) * this.drawSep;
 }
 
 ComputerViewer.prototype.drawLine = function(x1, y1, x2, y2) {
@@ -588,8 +595,8 @@ ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
 }
 
 ComputerViewer.prototype.drawGrid = function() {
-    this.ctx.lineWidth = 0.5;
-    this.ctx.strokeStyle = "#404040";
+    this.ctx.lineWidth = 1
+    this.ctx.strokeStyle = "#D0D0D0";
 
     for (var col = 0; col < this.computer.width; col++) {
         this.drawGridLine(col, 0, col, this.computer.height - 1);
@@ -606,7 +613,8 @@ ComputerViewer.prototype.drawPaths = function() {
     var tracker = this.computer.pathTracker;
     var count;
 
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 4;
+    this.ctx.lineCap = "round";
     
     for (var x = 0; x < this.computer.width; x++) {
         for (var y = 0; y < this.computer.height; y++) {
@@ -628,6 +636,7 @@ ComputerViewer.prototype.drawPaths = function() {
     }
 
     this.ctx.lineWidth = 1;
+    this.ctx.lineCap = "butt";
 }
 
 ComputerViewer.prototype.drawProgram = function() {
@@ -643,6 +652,14 @@ ComputerViewer.prototype.drawProgram = function() {
     }
 }
 
+ComputerViewer.prototype.drawNumSteps = function() {
+    this.ctx.font = "12px Arial";
+    this.ctx.fillStyle = "#000000";
+    var s = this.computer.numSteps;
+    var w = this.ctx.measureText(s).width;
+    this.ctx.fillText(s, this.canvas.width - w - 2, 14);
+}
+
 ComputerViewer.prototype.draw = function() {
     // Clear canvas
     this.ctx.fillStyle = "#FFFFFF";
@@ -654,6 +671,7 @@ ComputerViewer.prototype.draw = function() {
     if (this.computer.status != Status.READY) {
         this.drawProgramPointer();
     }
+    this.drawNumSteps();
 }
 
 /**
@@ -668,6 +686,7 @@ function ComputerControl(model) {
     this.numUpdatesSinceLastPlay = 0;
 
     this._setRunSpeed(4);
+    document.getElementById("speed-slider").value = this.runSpeed;
 
     var me = this;
     this.updateId = setInterval(function() { me._update() }, 40);
@@ -679,17 +698,10 @@ ComputerControl.prototype._updateButtons = function() {
     document.getElementById("step-button").disabled = !runnable || !this.paused;
     document.getElementById("play-button").disabled = !runnable || !this.paused;
     document.getElementById("pause-button").disabled = this.paused;
-    document.getElementById("slower-button").disabled = (this.runSpeed == 0);
-    document.getElementById("faster-button").disabled = (this.runSpeed == maxRunSpeed);
-}
-
-ComputerControl.prototype._updateStatus = function() {
-    document.getElementById("status").innerHTML = "Steps = " + this.model.numSteps;
 }
 
 ComputerControl.prototype._update = function() {
     this._updateButtons();
-    this._updateStatus();
     this.viewer.draw();
     this.dataViewer.draw();
 
@@ -740,7 +752,10 @@ ComputerControl.prototype._setRunSpeed = function(speed) {
 
 ComputerControl.prototype.changeRunSpeed = function(delta) {
     this._setRunSpeed(Math.min(maxRunSpeed, Math.max(0, this.runSpeed + delta)));
-    this._update();
+}
+
+ComputerControl.prototype.updateRunSpeed = function() {
+    this._setRunSpeed(document.getElementById("speed-slider").value);
 }
 
 ComputerControl.prototype.dump = function() {
