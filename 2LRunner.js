@@ -22,12 +22,6 @@ const dy = [1, 0, -1, 0];
 const maxRunSpeed = 20;
 const unitRunSpeed = 5;
 
-const programs = {
-    Loop_5x5: { w: 5, h: 5, program: "*_*__o___*o____o*_o_o__*_" },
-    BB_7x7_342959: { w: 7, h: 7, program: "_**____*oo__*___o**_*_*oooo**__oo_**_*o_o*o___o*_" },
-    BB_7x7_1842682: { w: 7, h: 7, program: "__*_____*o__*__*oo__*__o**o_*_oooo**o**___oo*__*_" }
-};
-
 const numHeatmapColors = 8;
 const heatmapColors = [
     "#0000FF", "#6A00FF", "#D500FF", "#FF00BD", "#FF0052", "#FF1800", "#FF8300", "#FFFF00"
@@ -767,8 +761,8 @@ ComputerControl.prototype.dump = function() {
 
 function init() {
     const urlParams = new URLSearchParams(window.location.search);
-    const w = urlParams.get('w') || 5;
-    const h = urlParams.get('h') || 5;
+    const w = parseInt(urlParams.get('w')) || 5;
+    const h = parseInt(urlParams.get('h')) || 5;
     const program = urlParams.get('p') || "*_*__o___*o____o*_o_o__*_";
 
     var computer = new Computer(w, h, 4096);
