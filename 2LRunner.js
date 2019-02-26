@@ -772,3 +772,11 @@ function init() {
 }
 
 var computerControl = init();
+
+// Export settings needed by the HTML page (so that they remain accessible after minification)
+window["computerControl"] = computerControl;
+ComputerControl.prototype["step"] = ComputerControl.prototype.step;
+ComputerControl.prototype["play"] = ComputerControl.prototype.play;
+ComputerControl.prototype["pause"] = ComputerControl.prototype.pause;
+ComputerControl.prototype["reset"] = ComputerControl.prototype.reset;
+ComputerControl.prototype["updateRunSpeed"] = ComputerControl.prototype.updateRunSpeed;
