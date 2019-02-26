@@ -367,7 +367,7 @@ Computer.prototype.getInstruction = function(col, row) {
     }
 }
 
-Computer.prototype.step = function(col, row) {
+Computer.prototype.step = function() {
     if (this.status == Status.READY) {
         this.status = Status.RUNNING;
     }
