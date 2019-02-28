@@ -677,6 +677,12 @@ ComputerViewer.prototype.drawNumSteps = function() {
 }
 
 ComputerViewer.prototype.draw = function() {
+    if (this.computer.numSteps == this.prevDrawSteps) {
+        // Nothing should have changed. Abort
+        return;
+    }
+    this.prevDrawSteps = this.computer.numSteps;
+
     // Clear canvas
     this.ctx.fillStyle = "#FFFFFF";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
