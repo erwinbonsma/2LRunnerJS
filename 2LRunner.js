@@ -532,16 +532,16 @@ ComputerViewer.prototype.calculateScale = function() {
 
     this.drawSep = (hsep < vsep) ? hsep : vsep;
     this.drawR = 0.4 * this.drawSep;
-    this.ppR = 0.25 * this.drawSep;
-    this.ppW = 0.05 * this.drawSep;
+    this.ppR = 0.2 * this.drawSep;
+    this.ppW = 1.0 * this.ppR;
 }
 
 ComputerViewer.prototype.getX = function(col) {
     if (col < 0) {
-        return 0.5 * this.drawSep;
+        return 0.4 * this.drawSep;
     }
     else if (col >= this.computer.width) {
-        return (this.computer.width + 0.5) * this.drawSep;
+        return (this.computer.width + 0.6) * this.drawSep;
     }
     else {
         return (col + 1) * this.drawSep;
@@ -549,7 +549,15 @@ ComputerViewer.prototype.getX = function(col) {
 }
 
 ComputerViewer.prototype.getY = function(row) {
-    return (this.computer.height - row) * this.drawSep;
+    if (row < 0) {
+        return (this.computer.height + 0.6) * this.drawSep;
+    }
+    else if (row >= this.computer.height) {
+        return 0.4 * this.drawSep;
+    }
+    else {
+        return (this.computer.height - row) * this.drawSep;
+    }
 }
 
 ComputerViewer.prototype.drawLine = function(x1, y1, x2, y2) {
@@ -578,15 +586,12 @@ ComputerViewer.prototype.drawProgramPointer = function() {
 
     this.ctx.translate(x, y);
     this.ctx.rotate(0.5 * Math.PI * this.computer.pp.dir);
+    this.ctx.translate(0, -0.2 * this.ppR);
 
     this.ctx.beginPath();
     this.ctx.moveTo(0, -this.ppR);
-    this.ctx.lineTo(-this.ppR, 0);
-    this.ctx.lineTo(-this.ppW, 0);
     this.ctx.lineTo(-this.ppW, this.ppR);
     this.ctx.lineTo( this.ppW, this.ppR);
-    this.ctx.lineTo( this.ppW, 0);
-    this.ctx.lineTo( this.ppR, 0);
     this.ctx.lineTo(0, -this.ppR);
     this.ctx.fill();
     this.ctx.stroke();
