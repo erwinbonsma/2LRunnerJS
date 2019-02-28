@@ -761,9 +761,25 @@ ComputerControl.prototype.dump = function() {
 
 function init() {
     const urlParams = new URLSearchParams(window.location.search);
-    const w = parseInt(urlParams.get('w')) || 5;
-    const h = parseInt(urlParams.get('h')) || 5;
-    const program = urlParams.get('p') || "*_*__o___*o____o*_o_o__*_";
+    var w = parseInt(urlParams.get('w'), 10) || 0;
+    var h = parseInt(urlParams.get('h'), 10) || 0;
+    const program = urlParams.get('p') || "*_*__o___*o____o*_ooo__*_";
+    if (w==0 || h==0) {
+        const len = program.length;
+        if (w==0 && h==0) {
+            h = w = Math.round(Math.sqrt(len));
+        }
+        else if (w == 0) {
+            w = Math.round(len / h);
+        } else {
+            h = Math.round(len / w);
+        }
+
+        if (h * w != len) {
+            console.log("Cannot automatically infer program dimensions");
+            return;
+        }
+    }
 
     var computer = new Computer(w, h, 4096);
     computer.loadProgram(program);
