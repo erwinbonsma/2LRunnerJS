@@ -532,11 +532,20 @@ ComputerViewer.prototype.calculateScale = function() {
 
     this.drawSep = (hsep < vsep) ? hsep : vsep;
     this.drawR = 0.4 * this.drawSep;
-    this.ppR = 0.45 * this.drawSep;
+    this.ppR = 0.25 * this.drawSep;
+    this.ppW = 0.05 * this.drawSep;
 }
 
 ComputerViewer.prototype.getX = function(col) {
-    return (col + 1) * this.drawSep;
+    if (col < 0) {
+        return 0.5 * this.drawSep;
+    }
+    else if (col >= this.computer.width) {
+        return (this.computer.width + 0.5) * this.drawSep;
+    }
+    else {
+        return (col + 1) * this.drawSep;
+    }
 }
 
 ComputerViewer.prototype.getY = function(row) {
@@ -556,26 +565,33 @@ ComputerViewer.prototype.drawGridLine = function(col1, row1, col2, row2) {
 
 ComputerViewer.prototype.drawProgramPointer = function() {
     switch (this.computer.status) {
-        case Status.ERROR: this.ctx.strokeStyle = "#FF0000"; break;
-        case Status.RUNNING: this.ctx.strokeStyle = "#008000"; break;
-        case Status.DONE: this.ctx.strokeStyle = "#008000"; break;
+        case Status.ERROR: this.ctx.fillStyle = "#FF0000"; break;
+        case Status.RUNNING: this.ctx.fillStyle = "#404040"; break;
+        case Status.DONE: this.ctx.fillStyle = "#808080"; break;
     }
+    this.ctx.strokeStyle = "#000000";
+
     var x = this.getX(this.computer.pp.col);
     var y = this.getY(this.computer.pp.row);
-    this.ctx.lineWidth = 2;
+
+    this.ctx.save();
+
+    this.ctx.translate(x, y);
+    this.ctx.rotate(0.5 * Math.PI * this.computer.pp.dir);
+
     this.ctx.beginPath();
-    this.ctx.rect(x - this.ppR, y - this.ppR, this.ppR * 2, this.ppR * 2);
+    this.ctx.moveTo(0, -this.ppR);
+    this.ctx.lineTo(-this.ppR, 0);
+    this.ctx.lineTo(-this.ppW, 0);
+    this.ctx.lineTo(-this.ppW, this.ppR);
+    this.ctx.lineTo( this.ppW, this.ppR);
+    this.ctx.lineTo( this.ppW, 0);
+    this.ctx.lineTo( this.ppR, 0);
+    this.ctx.lineTo(0, -this.ppR);
+    this.ctx.fill();
     this.ctx.stroke();
 
-    this.ctx.strokeStyle = "#00D000";
-    this.ctx.lineWidth = 2;
-    switch (this.computer.pp.dir) {
-        case Dir.UP: this.drawLine(x - this.ppR, y - this.ppR, x + this.ppR, y - this.ppR); break;
-        case Dir.RIGHT: this.drawLine(x + this.ppR, y - this.ppR, x + this.ppR, y + this.ppR); break;
-        case Dir.DOWN: this.drawLine(x - this.ppR, y + this.ppR, x + this.ppR, y + this.ppR); break;
-        case Dir.LEFT: this.drawLine(x - this.ppR, y - this.ppR, x - this.ppR, y + this.ppR); break;
-    }
-    this.ctx.lineWidth = 1;
+    this.ctx.restore();
 }
 
 ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
