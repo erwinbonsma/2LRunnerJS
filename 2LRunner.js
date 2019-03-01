@@ -528,7 +528,7 @@ DataViewer.prototype.draw = function() {
 /**
  * @constructor
  */
-function ComputerViewer(computer) {
+function ProgramViewer(computer) {
     this.computer = computer;
 
     this.canvas = document.getElementById("programCanvas");
@@ -537,7 +537,7 @@ function ComputerViewer(computer) {
     this.calculateScale();
 }
 
-ComputerViewer.prototype.calculateScale = function() {
+ProgramViewer.prototype.calculateScale = function() {
     var hsep = this.canvas.width / (this.computer.width + 1);
     var vsep = this.canvas.height / (this.computer.height + 1);
 
@@ -547,7 +547,7 @@ ComputerViewer.prototype.calculateScale = function() {
     this.ppW = 1.0 * this.ppR;
 }
 
-ComputerViewer.prototype.getX = function(col) {
+ProgramViewer.prototype.getX = function(col) {
     if (col < 0) {
         return 0.4 * this.drawSep;
     }
@@ -559,7 +559,7 @@ ComputerViewer.prototype.getX = function(col) {
     }
 }
 
-ComputerViewer.prototype.getY = function(row) {
+ProgramViewer.prototype.getY = function(row) {
     if (row < 0) {
         return (this.computer.height + 0.6) * this.drawSep;
     }
@@ -571,18 +571,18 @@ ComputerViewer.prototype.getY = function(row) {
     }
 }
 
-ComputerViewer.prototype.drawLine = function(x1, y1, x2, y2) {
+ProgramViewer.prototype.drawLine = function(x1, y1, x2, y2) {
     this.ctx.beginPath();
     this.ctx.moveTo(x1, y1);
     this.ctx.lineTo(x2, y2);
     this.ctx.stroke();
 }
 
-ComputerViewer.prototype.drawGridLine = function(col1, row1, col2, row2) {
+ProgramViewer.prototype.drawGridLine = function(col1, row1, col2, row2) {
     this.drawLine(this.getX(col1), this.getY(row1), this.getX(col2), this.getY(row2));
 }
 
-ComputerViewer.prototype.drawProgramPointer = function() {
+ProgramViewer.prototype.drawProgramPointer = function() {
     switch (this.computer.status) {
         case Status.ERROR: this.ctx.fillStyle = "#FF0000"; break;
         case Status.RUNNING: this.ctx.fillStyle = "#404040"; break;
@@ -610,7 +610,7 @@ ComputerViewer.prototype.drawProgramPointer = function() {
     this.ctx.restore();
 }
 
-ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
+ProgramViewer.prototype.drawCircle = function(col, row, fillColor) {
     this.ctx.fillStyle = fillColor;
     this.ctx.strokeStyle = "#404040";
 
@@ -621,7 +621,7 @@ ComputerViewer.prototype.drawCircle = function(col, row, fillColor) {
     this.ctx.stroke();
 }
 
-ComputerViewer.prototype.drawGrid = function() {
+ProgramViewer.prototype.drawGrid = function() {
     this.ctx.lineWidth = 1
     this.ctx.strokeStyle = "#808080";
 
@@ -636,7 +636,7 @@ ComputerViewer.prototype.drawGrid = function() {
     this.ctx.lineWidth = 1;
 }
 
-ComputerViewer.prototype.drawPaths = function() {
+ProgramViewer.prototype.drawPaths = function() {
     var tracker = this.computer.pathTracker;
     var count;
 
@@ -666,7 +666,7 @@ ComputerViewer.prototype.drawPaths = function() {
     this.ctx.lineCap = "butt";
 }
 
-ComputerViewer.prototype.drawProgram = function() {
+ProgramViewer.prototype.drawProgram = function() {
     for (var col = 0; col < this.computer.width; col++) {
         for (var row = 0; row < this.computer.height; row++) {
             var ins = this.computer.getInstruction(col, row);
@@ -679,7 +679,7 @@ ComputerViewer.prototype.drawProgram = function() {
     }
 }
 
-ComputerViewer.prototype.drawNumSteps = function() {
+ProgramViewer.prototype.drawNumSteps = function() {
     this.ctx.font = "12px Arial";
     this.ctx.fillStyle = "#000000";
     var s = this.computer.numSteps;
@@ -687,7 +687,7 @@ ComputerViewer.prototype.drawNumSteps = function() {
     this.ctx.fillText(s, this.canvas.width - w, this.canvas.height);
 }
 
-ComputerViewer.prototype.draw = function() {
+ProgramViewer.prototype.draw = function() {
     if (this.computer.numSteps == this.prevDrawSteps) {
         // Nothing has changed. No need to redraw.
         return;
@@ -712,7 +712,7 @@ ComputerViewer.prototype.draw = function() {
  */
 function ComputerControl(model) {
     this.model = model;
-    this.viewer = new ComputerViewer(model);
+    this.programViewer = new ProgramViewer(model);
     this.dataViewer = new DataViewer(model.data);
 
     this.paused = true;
@@ -735,7 +735,7 @@ ComputerControl.prototype._updateButtons = function() {
 
 ComputerControl.prototype._update = function() {
     this._updateButtons();
-    this.viewer.draw();
+    this.programViewer.draw();
     this.dataViewer.draw();
 
     if (!this.paused) {
