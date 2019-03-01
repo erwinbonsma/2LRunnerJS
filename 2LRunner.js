@@ -67,6 +67,7 @@ Data.prototype.reset = function() {
     this.data = [];
     this.data[0] = 0;
     this.dp = 0;
+    this.changeCount = 0;
 }
 
 Data.prototype.value = function() {
@@ -82,14 +83,17 @@ Data.prototype.valueAt = function(index) {
 
 Data.prototype.inc = function() {
     this.data[this.dp] += 1;
+    this.changeCount++;
 }
 
-Data.prototype.dec= function() {
+Data.prototype.dec = function() {
     this.data[this.dp] -= 1;
+    this.changeCount++;
 }
 
 Data.prototype.shr = function() {
     this.dp++;
+    this.changeCount++;
     if (this.dp > this.maxBound) {
         if (this.maxBound - this.minBound < this.size) {
             this.maxBound = this.dp;
@@ -104,6 +108,7 @@ Data.prototype.shr = function() {
 
 Data.prototype.shl = function() {
     this.dp--;
+    this.changeCount++;
     if (this.dp < this.minBound) {
         if (this.maxBound - this.minBound < this.size) {
             this.minBound = this.dp;
@@ -488,16 +493,22 @@ DataViewer.prototype._drawValues = function(x, i, inc) {
 }
 
 DataViewer.prototype.draw = function() {
+    if (this.data.dp != this.desiredCenterAddress) {
+        this._adjustDeltaToDesired(this.data.dp);
+    }
+    else if (Math.abs(this.deltaToDesired) > 0.2) {
+        this.deltaToDesired = (this.deltaToDesired * 4) / 5;
+    }
+    else if (this.data.changeCount == this.prevChangeCount) {
+        // Nothing has changed. No need to redraw.
+        return;
+    }
+    this.prevChangeCount = this.data.changeCount;
+
     // Clear canvas
     this.ctx.fillStyle = "#FFFFFF";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    if (this.data.dp != this.desiredCenterAddress) {
-        this._adjustDeltaToDesired(this.data.dp);
-    }
-    else if (this.deltaToDesired != 0) {
-        this.deltaToDesired = (this.deltaToDesired * 4) / 5;
-    }
 
     var w = this._widthOfValueAt(this.desiredCenterAddress);
     var x = (this.canvas.width - w) / 2;
@@ -678,7 +689,7 @@ ComputerViewer.prototype.drawNumSteps = function() {
 
 ComputerViewer.prototype.draw = function() {
     if (this.computer.numSteps == this.prevDrawSteps) {
-        // Nothing should have changed. Abort
+        // Nothing has changed. No need to redraw.
         return;
     }
     this.prevDrawSteps = this.computer.numSteps;
