@@ -441,6 +441,16 @@ function DataViewer(data) {
 
     this.desiredCenterAddress = 0;
     this.deltaToDesired = 0;
+
+    this.frozen = false;
+}
+
+DataViewer.prototype.freeze = function() {
+    this.frozen = true;
+}
+
+DataViewer.prototype.defrost = function() {
+    this.frozen = false;
 }
 
 DataViewer.prototype._setColor = function(activeValue) {
@@ -497,7 +507,9 @@ DataViewer.prototype.draw = function() {
         this._adjustDeltaToDesired(this.data.dp);
     }
     else if (Math.abs(this.deltaToDesired) > 0.2) {
-        this.deltaToDesired = (this.deltaToDesired * 4) / 5;
+        if (!this.frozen) {
+            this.deltaToDesired = (this.deltaToDesired * 4) / 5;
+        }
     }
     else if (this.data.changeCount == this.prevChangeCount) {
         // Nothing has changed. No need to redraw.
@@ -721,8 +733,35 @@ function ComputerControl(model) {
     this._setRunSpeed(4);
     document.getElementById("speed-slider").value = this.runSpeed;
 
-    var me = this;
+    const me = this;
     this.updateId = setInterval(function() { me._update() }, 40);
+
+    this._handleDataViewerDrags();
+}
+
+ComputerControl.prototype._handleDataViewerDrags = function() {
+    const me = this;
+    const canvas = this.dataViewer.canvas;
+
+    canvas.onmousedown = function(event) {
+        if (!me.paused) {
+            return; // Can only drag when the program is paused
+        }
+
+        function onMouseMove(event) {
+            me.dataViewer.deltaToDesired += event.movementX;
+        }
+
+        function abortDrag() {
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", abortDrag);
+            me.dataViewer.defrost();
+        }
+
+        me.dataViewer.freeze();
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", abortDrag);
+    }
 }
 
 ComputerControl.prototype._updateButtons = function() {
