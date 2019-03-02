@@ -785,9 +785,17 @@ ComputerControl.prototype._update = function() {
     }
 }
 
+ComputerControl.prototype._postStep = function() {
+    this.model.pathTracker.rankVisitCounts();
+
+    if (this.model.status != Status.RUNNING) {
+        this.paused = true;
+    }
+}
+
 ComputerControl.prototype.step = function() {
     this.model.step();
-    this.model.pathTracker.rankVisitCounts();
+    this._postStep();
 }
 
 ComputerControl.prototype._playTick = function() {
@@ -795,7 +803,7 @@ ComputerControl.prototype._playTick = function() {
     while (numSteps-- > 0) {
         this.model.step();
     }
-    this.model.pathTracker.rankVisitCounts();
+    this._postStep();
 }
 
 ComputerControl.prototype.reset = function() {
