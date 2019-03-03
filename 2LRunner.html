@@ -19,40 +19,40 @@
 <body>
 
 <div class="container my-container">
-    <div class="row justify-content-center">
-        <div class="col-auto">
-            <div class="row justify-content-center align-items-center">
-                <div class="col-auto">
-                    <button id="step-button" onclick="computerControl.step()" >
-                        <svg width="25" height="15" viewBox="0 0 6 6" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.41421;">
-                            <path d="M0,0.5l3,2.5l-3,2.5Z" style="fill:#222;" />
-                            <path d="M4,0.5h2v5h-2v-5" style="fill:#222;" />
-                        </svg>
-                    </button>
-                    <button id="play-button" onclick="computerControl.play()" >
-                        <svg width="25" height="15" viewBox="0 0 2 2" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.41421;">
-                            <path d="M0.4,0l1.2,1l-1.2,1Z" style="fill:#222;"/>
-                        </svg>
-                    </button>
-                    <button id="pause-button" onclick="computerControl.pause()" >
-                        <svg width="25" height="15" viewBox="0 0 6 6" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.41421;">
-                            <path d="M0.5,0.5h2v5h-2v-5M3.5,0.5h2v5h-2v-5" style="fill:#222;"/>
-                        </svg>
-                    </button>
-                    <button id="reset-button" onclick="computerControl.reset()" >
-                        <svg width="25" height="15" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:1.41421;">
-                            <circle cx="15" cy="15" r="12" style="fill:#222;"/>
-                        </svg>
-                    </button>
-                </div>
-                <div class="col-auto">
-                    <input id="speed-slider" type="range" class="small-slider" min="0" max="20" oninput="computerControl.updateRunSpeed()" >
-                </div>
-            </div>
-            <div class="row justify-content-center"><canvas id="programCanvas" width="300" height="300"></canvas></div>
-            <div class="row justify-content-center"><canvas id="dataCanvas" width="300" height="30"></canvas></div>
-        </div>
-    </div>
+  <div class="row justify-content-center">
+    <div class="col-auto">
+      <div class="row justify-content-center align-items-center">
+         <div class="col-auto">
+           <button id="step-button" onclick="computerControl.step()" >
+             <svg width="25" height="15" viewBox="0 0 6 6" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve">
+               <path d="M0,0.5l3,2.5l-3,2.5Z" style="fill:#222;" />
+               <path d="M4,0.5h2v5h-2v-5" style="fill:#222;" />
+             </svg>
+           </button>
+           <button id="play-button" onclick="computerControl.play()" >
+             <svg width="25" height="15" viewBox="0 0 2 2" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve">
+               <path d="M0.4,0l1.2,1l-1.2,1Z" style="fill:#222;"/>
+             </svg>
+           </button>
+           <button id="pause-button" onclick="computerControl.pause()" >
+             <svg width="25" height="15" viewBox="0 0 6 6" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve">
+               <path d="M0.5,0.5h2v5h-2v-5M3.5,0.5h2v5h-2v-5" style="fill:#222;"/>
+             </svg>
+           </button>
+           <button id="reset-button" onclick="computerControl.reset()" >
+             <svg width="25" height="15" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve">
+               <circle cx="15" cy="15" r="12" style="fill:#222;"/>
+             </svg>
+           </button>
+         </div>
+         <div class="col-auto">
+           <input id="speed-slider" type="range" class="small-slider" min="0" max="20" oninput="computerControl.updateRunSpeed()" >
+         </div>
+       </div>
+       <div class="row justify-content-center"><canvas id="programCanvas" width="300" height="260"></canvas></div>
+       <div class="row justify-content-center"><canvas id="dataCanvas" width="300" height="30"></canvas></div>
+     </div>
+  </div>
 </div>
 
 </body>
