@@ -872,6 +872,25 @@ function init() {
     return new ComputerControl(computer);
 }
 
+// In case URLSearchParams function does not exist (e.g. Edge browsers), provide custom one.
+// Implementation taken from:
+// https://stackoverflow.com/questions/45758837/script5009-urlsearchparams-is-undefined-in-ie-11
+(function (w) {
+    w.URLSearchParams = w.URLSearchParams || function (searchString) {
+        var self = this;
+        self.searchString = searchString;
+        self.get = function (name) {
+            var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(self.searchString);
+            if (results == null) {
+                return null;
+            }
+            else {
+                return decodeURI(results[1]) || 0;
+            }
+        };
+    }
+})(window)
+
 var computerControl = init();
 
 // Export settings needed by the HTML page (so that they remain accessible after minification)
