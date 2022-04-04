@@ -877,7 +877,7 @@ function init() {
         }
     }
 
-    var computer = new Computer(w, h, 4096);
+    var computer = new Computer(w, h, 8192);
     computer.loadProgram(program);
 
     return new ComputerControl(computer);
