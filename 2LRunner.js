@@ -64,6 +64,8 @@ function Data(size) {
 Data.prototype.reset = function() {
     this.minBound = 0;
     this.maxBound = 0;
+    this.minValue = 0;
+    this.maxValue = 0;
     this.data = [];
     this.data[0] = 0;
     this.dp = 0;
@@ -84,11 +86,13 @@ Data.prototype.valueAt = function(index) {
 Data.prototype.inc = function() {
     this.data[this.dp] += 1;
     this.changeCount++;
+    this.maxValue = Math.max(this.data[this.dp], this.maxValue);
 }
 
 Data.prototype.dec = function() {
     this.data[this.dp] -= 1;
     this.changeCount++;
+    this.minValue = Math.min(this.data[this.dp], this.minValue);
 }
 
 Data.prototype.shr = function() {
@@ -155,12 +159,12 @@ function PathTracker(width, height) {
     this.height = height;
     this.horizontalCounts = [];
     this.verticalCounts = [];
-    
+
     for (var x = 0; x < width; x++) {
         this.horizontalCounts[x] = [];
         this.verticalCounts[x] = [];
     }
-    
+
     this.reset();
 }
 
@@ -524,7 +528,7 @@ DataViewer.prototype.draw = function() {
 
     var w = this._widthOfValueAt(this.desiredCenterAddress);
     var x = (this.canvas.width - w) / 2;
-    
+
     if (this.deltaToDesired > this.canvas.width / 2) {
         this.deltaToDesired = this.canvas.width / 2;
     }
@@ -654,7 +658,7 @@ ProgramViewer.prototype.drawPaths = function() {
 
     this.ctx.lineWidth = 4;
     this.ctx.lineCap = "round";
-    
+
     for (var x = 0; x < this.computer.width; x++) {
         for (var y = 0; y < this.computer.height; y++) {
             if (x < this.computer.width - 1) {
@@ -790,6 +794,13 @@ ComputerControl.prototype._postStep = function() {
 
     if (this.model.status != Status.RUNNING) {
         this.paused = true;
+        const data = this.model.data;
+        console.log(
+            `steps = ${this.model.numSteps}, ` +
+            `minValue = ${data.minValue}, ` +
+            `maxValue = ${data.maxValue}, ` +
+            `dataSize = ${data.maxBound - data.minBound + 1}`
+        );
     }
 }
 
