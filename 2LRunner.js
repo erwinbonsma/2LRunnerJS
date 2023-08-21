@@ -310,10 +310,16 @@ PathTracker.prototype.dump = function() {
 /**
  * @constructor
  */
-function Computer(width, height, datasize) {
+function Computer(datasize) {
+    this.data = new Data(datasize);
+
+    this.reset();
+}
+
+Computer.prototype._initProgram = function(width, height) {
     this.width = width;
     this.height = height;
-    this.data = new Data(datasize);
+
     this.pathTracker = new PathTracker(width, height);
 
     this.program = [];
@@ -323,26 +329,28 @@ function Computer(width, height, datasize) {
             this.program[col][row] = Instruction.NOOP;
         }
     }
-
-    this.reset();
 }
 
 Computer.prototype.reset = function() {
     this.data.reset();
-    this.pathTracker.reset();
     this.pp = new ProgramPointer();
     this.status = Status.READY;
     this.numSteps = 0;
+    this.pathTracker?.reset();
 }
 
-Computer.prototype.loadProgram = function(programString) {
-    var col = 0, row = this.height - 1;
-    var i = 0;
+Computer.prototype._loadProgramFromWebString = function(programString) {
+    var size = Math.round(Math.sqrt(len));
 
-    if (programString.length != this.width * this.height) {
-        console.log("Computer string length invalid");
+    if (size * size != programString.length) {
+        console.log("Web programs must be square");
         return;
     }
+
+    this._initProgram(size, size);
+
+    var col = 0, row = this.height - 1;
+    var i = 0;
 
     while (i < programString.length) {
         var ins = Instruction.NOOP; // Default
@@ -350,12 +358,48 @@ Computer.prototype.loadProgram = function(programString) {
             case '_': ins = Instruction.NOOP; break;
             case 'o': ins = Instruction.DATA; break;
             case '*': ins = Instruction.TURN; break;
-            default: console.log("Invalid character in program string");
+            default: console.warn("Invalid character in program string");
         }
         this.program[col++][row] = ins;
         if (col == this.width) {
             col = 0;
             row--;
+        }
+    }
+
+    console.log("Program loaded");
+}
+
+Computer.prototype._loadProgramFromBase27String = function(programString) {
+    const w = parseInt(programString.substring(0, 1));
+    const h = parseInt(programString.substring(1, 2));
+
+    this._initProgram(w, h);
+
+    var col = 0, row = h - 1;
+    var i = 2;
+    var v = [];
+
+    while (row >= 0) {
+        if (v.length == 0) {
+            if (i == programString.length) {
+                console.error("Program string too short");
+                return
+            }
+
+            var ch = programString[i++];
+            var val = ch == '_' ? 0 : (ch.charCodeAt(0) - 97) + 1;
+            while (v.length < 3) {
+                v.push(val % 3);
+                val = Math.floor(val / 3);
+            }
+        }
+
+        this.program[col][row] = v.pop();
+
+        if (++col == this.width) {
+            col = 0;
+            row -= 1;
         }
     }
 
@@ -856,29 +900,18 @@ ComputerControl.prototype.dump = function() {
 }
 
 function init() {
+    var computer = new Computer(8192);
+
     const urlParams = new URLSearchParams(window.location.search);
-    var w = parseInt(urlParams.get('w'), 10) || 0;
-    var h = parseInt(urlParams.get('h'), 10) || 0;
     const program = urlParams.get('p') || "*_*__o___*o____o*_ooo__*_";
-    if (w==0 || h==0) {
-        const len = program.length;
-        if (w==0 && h==0) {
-            h = w = Math.round(Math.sqrt(len));
-        }
-        else if (w == 0) {
-            w = Math.round(len / h);
-        } else {
-            h = Math.round(len / w);
-        }
 
-        if (h * w != len) {
-            console.log("Cannot automatically infer program dimensions");
-            return;
-        }
+    if (program.includes("*")) {
+        console.info("Loading from web string");
+        computer._loadProgramFromWebString(program);
+    } else {
+        console.info("Loading from base-27 string")
+        computer._loadProgramFromBase27String(program);
     }
-
-    var computer = new Computer(w, h, 8192);
-    computer.loadProgram(program);
 
     return new ComputerControl(computer);
 }
