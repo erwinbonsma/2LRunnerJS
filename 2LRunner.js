@@ -310,46 +310,45 @@ PathTracker.prototype.dump = function() {
 /**
  * @constructor
  */
-function Computer(datasize) {
-    this.data = new Data(datasize);
-
-    this.reset();
-}
-
-Computer.prototype._initProgram = function(width, height) {
+function Program(width, height) {
     this.width = width;
     this.height = height;
 
-    this.pathTracker = new PathTracker(width, height);
-
-    this.program = [];
+    this.instructions = [];
     for (var col = 0; col < width; col++) {
-        this.program[col] = []
+        this.instructions[col] = []
         for (var row = 0; row < height; row++) {
-            this.program[col][row] = Instruction.NOOP;
+            this.instructions[col][row] = Instruction.NOOP;
         }
     }
 }
 
-Computer.prototype.reset = function() {
-    this.data.reset();
-    this.pp = new ProgramPointer();
-    this.status = Status.READY;
-    this.numSteps = 0;
-    this.pathTracker?.reset();
+Program.prototype.getInstruction = function(col, row) {
+    if (col < 0 || col >= this.width || row < 0 || row >= this.height) {
+        return Instruction.DONE;
+    } else {
+        return this.instructions[col][row];
+    }
 }
 
-Computer.prototype._loadProgramFromWebString = function(programString) {
-    var size = Math.round(Math.sqrt(len));
+Program.prototype.setInstruction = function(col, row, ins) {
+    if (col < 0 || col >= this.width || row < 0 || row >= this.height) {
+        console.warn("Instruction out of bounds");
+    } else {
+        this.instructions[col][row] = ins;
+    }
+}
+
+function loadProgramFromWebString(programString) {
+    var size = Math.round(Math.sqrt(programString.length));
 
     if (size * size != programString.length) {
         console.log("Web programs must be square");
         return;
     }
 
-    this._initProgram(size, size);
-
-    var col = 0, row = this.height - 1;
+    var program = new Program(size, size);
+    var col = 0, row = size - 1;
     var i = 0;
 
     while (i < programString.length) {
@@ -360,21 +359,21 @@ Computer.prototype._loadProgramFromWebString = function(programString) {
             case '*': ins = Instruction.TURN; break;
             default: console.warn("Invalid character in program string");
         }
-        this.program[col++][row] = ins;
-        if (col == this.width) {
+        program.setInstruction(col++, row, ins);
+        if (col == size) {
             col = 0;
             row--;
         }
     }
 
-    console.log("Program loaded");
+    return program;
 }
 
-Computer.prototype._loadProgramFromBase27String = function(programString) {
+function loadProgramFromBase27String(programString) {
     const w = parseInt(programString.substring(0, 1));
     const h = parseInt(programString.substring(1, 2));
 
-    this._initProgram(w, h);
+    var program = new Program(w, h);
 
     var col = 0, row = h - 1;
     var i = 2;
@@ -395,23 +394,35 @@ Computer.prototype._loadProgramFromBase27String = function(programString) {
             }
         }
 
-        this.program[col][row] = v.pop();
+        program.setInstruction(col, row, v.pop());
 
-        if (++col == this.width) {
+        if (++col == w) {
             col = 0;
             row -= 1;
         }
     }
 
-    console.log("Program loaded");
+    return program;
 }
 
-Computer.prototype.getInstruction = function(col, row) {
-    if (col < 0 || col >= this.width || row < 0 || row >= this.height) {
-        return Instruction.DONE;
-    } else {
-        return this.program[col][row];
-    }
+/**
+ * @constructor
+ */
+function Computer(datasize, program) {
+    this.program = program;
+
+    this.data = new Data(datasize);
+    this.pathTracker = new PathTracker(program.width, program.height);
+
+    this.reset();
+}
+
+Computer.prototype.reset = function() {
+    this.data.reset();
+    this.pp = new ProgramPointer();
+    this.status = Status.READY;
+    this.numSteps = 0;
+    this.pathTracker.reset();
 }
 
 Computer.prototype.step = function() {
@@ -429,7 +440,7 @@ Computer.prototype.step = function() {
         col = this.pp.col + dx[this.pp.dir];
         row = this.pp.row + dy[this.pp.dir];
 
-        instruction = this.getInstruction(col, row);
+        instruction = this.program.getInstruction(col, row);
         switch (instruction) {
             case Instruction.NOOP:
                 break;
@@ -598,8 +609,9 @@ function ProgramViewer(computer) {
 }
 
 ProgramViewer.prototype.calculateScale = function() {
-    var hsep = this.canvas.width / (this.computer.width + 1);
-    var vsep = this.canvas.height / (this.computer.height + 1);
+    const program = this.computer.program;
+    var hsep = this.canvas.width / (program.width + 1);
+    var vsep = this.canvas.height / (program.height + 1);
 
     this.drawSep = (hsep < vsep) ? hsep : vsep;
     this.drawR = 0.4 * this.drawSep;
@@ -608,11 +620,12 @@ ProgramViewer.prototype.calculateScale = function() {
 }
 
 ProgramViewer.prototype.getX = function(col) {
+    const program = this.computer.program;
     if (col < 0) {
         return 0.4 * this.drawSep;
     }
-    else if (col >= this.computer.width) {
-        return (this.computer.width + 0.6) * this.drawSep;
+    else if (col >= program.width) {
+        return (program.width + 0.6) * this.drawSep;
     }
     else {
         return (col + 1) * this.drawSep;
@@ -620,14 +633,15 @@ ProgramViewer.prototype.getX = function(col) {
 }
 
 ProgramViewer.prototype.getY = function(row) {
+    const program = this.computer.program;
     if (row < 0) {
-        return (this.computer.height + 0.6) * this.drawSep;
+        return (program.height + 0.6) * this.drawSep;
     }
-    else if (row >= this.computer.height) {
+    else if (row >= program.height) {
         return 0.4 * this.drawSep;
     }
     else {
-        return (this.computer.height - row) * this.drawSep;
+        return (program.height - row) * this.drawSep;
     }
 }
 
@@ -685,12 +699,14 @@ ProgramViewer.prototype.drawGrid = function() {
     this.ctx.lineWidth = 1
     this.ctx.strokeStyle = "#808080";
 
-    for (var col = 0; col < this.computer.width; col++) {
-        this.drawGridLine(col, 0, col, this.computer.height - 1);
+    const program = this.computer.program;
+    console.log(`w=${program.width}, h=${program.height}`)
+    for (var col = 0; col < program.width; col++) {
+        this.drawGridLine(col, 0, col, program.height - 1);
     }
 
-    for (var row = 0; row < this.computer.height; row++) {
-        this.drawGridLine(0, row, this.computer.width - 1, row);
+    for (var row = 0; row < program.height; row++) {
+        this.drawGridLine(0, row, program.width - 1, row);
     }
 
     this.ctx.lineWidth = 1;
@@ -703,16 +719,17 @@ ProgramViewer.prototype.drawPaths = function() {
     this.ctx.lineWidth = 4;
     this.ctx.lineCap = "round";
 
-    for (var x = 0; x < this.computer.width; x++) {
-        for (var y = 0; y < this.computer.height; y++) {
-            if (x < this.computer.width - 1) {
+    const program = this.computer.program;
+    for (var x = 0; x < program.width; x++) {
+        for (var y = 0; y < program.height; y++) {
+            if (x < program.width - 1) {
                 count = tracker.getHorizontalVisitCount(x, y);
                 if (count > 0) {
                     this.ctx.strokeStyle = tracker.colorForVisitCount(count);
                     this.drawGridLine(x, y, x + 1, y);
                 }
             }
-            if (y < this.computer.height - 1) {
+            if (y < program.height - 1) {
                 count = tracker.getVerticalVisitCount(x, y);
                 if (count > 0) {
                     this.ctx.strokeStyle = tracker.colorForVisitCount(count);
@@ -727,9 +744,10 @@ ProgramViewer.prototype.drawPaths = function() {
 }
 
 ProgramViewer.prototype.drawProgram = function() {
-    for (var col = 0; col < this.computer.width; col++) {
-        for (var row = 0; row < this.computer.height; row++) {
-            var ins = this.computer.getInstruction(col, row);
+    const program = this.computer.program;
+    for (var col = 0; col < program.width; col++) {
+        for (var row = 0; row < program.height; row++) {
+            var ins = program.getInstruction(col, row);
 
             switch (ins) {
                 case Instruction.DATA: this.drawCircle(col, row, "#FFFFFF"); break;
@@ -763,7 +781,7 @@ ProgramViewer.prototype.draw = function() {
     this.drawProgram();
     if (this.computer.status != Status.READY) {
         this.drawProgramPointer();
-       this.drawNumSteps();
+        this.drawNumSteps();
     }
 }
 
@@ -900,18 +918,19 @@ ComputerControl.prototype.dump = function() {
 }
 
 function init() {
-    var computer = new Computer(8192);
-
     const urlParams = new URLSearchParams(window.location.search);
-    const program = urlParams.get('p') || "*_*__o___*o____o*_ooo__*_";
 
-    if (program.includes("*")) {
+    const programString = urlParams.get('p') || "*_*__o___*o____o*_ooo__*_";
+    var program;
+    if (programString.includes("*")) {
         console.info("Loading from web string");
-        computer._loadProgramFromWebString(program);
+        program = loadProgramFromWebString(programString);
     } else {
         console.info("Loading from base-27 string")
-        computer._loadProgramFromBase27String(program);
+        program = loadProgramFromBase27String(programString);
     }
+
+    var computer = new Computer(8192, program);
 
     return new ComputerControl(computer);
 }
