@@ -339,6 +339,23 @@ Program.prototype.setInstruction = function(col, row, ins) {
     }
 }
 
+Program.prototype.dump = function() {
+    s = ""
+    for (var row = this.height - 1; row >= 0; --row) {
+        for (var col = 0; col < this.width; ++col) {
+            if (col > 0) s += " ";
+            switch (this.getInstruction(col, row)) {
+                case Instruction.NOOP: s += "_"; break;
+                case Instruction.DATA: s += "o"; break;
+                case Instruction.TURN: s += "*"; break;
+                default: s += "?";
+            }
+        }
+        s += "\n";
+    }
+    console.info(s);
+}
+
 function loadProgramFromWebString(programString) {
     var size = Math.round(Math.sqrt(programString.length));
 
@@ -929,6 +946,7 @@ function init() {
         console.info("Loading from base-27 string")
         program = loadProgramFromBase27String(programString);
     }
+    program.dump();
 
     var computer = new Computer(8192, program);
 
