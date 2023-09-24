@@ -27,6 +27,14 @@ const heatmapColors = [
     "#0000FF", "#6A00FF", "#D500FF", "#FF00BD", "#FF0052", "#FF1800", "#FF8300", "#FFFF00"
 ];
 
+const fromBase64 = [
+    62,  255, 62,  255, 63,  52,  53, 54, 55, 56, 57, 58, 59, 60, 61, 255,
+    255, 0,   255, 255, 255, 255, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+    10,  11,  12,  13,  14,  15,  16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    255, 255, 255, 255, 63,  255, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
+    36,  37,  38,  39,  40,  41,  42, 43, 44, 45, 46, 47, 48, 49, 50, 51
+];
+
 /**
  * @constructor
  */
@@ -416,6 +424,59 @@ function loadProgramFromBase27String(programString) {
         if (++col == w) {
             col = 0;
             row -= 1;
+        }
+    }
+
+    return program;
+}
+
+function b64_decode(s) {
+    var out = [];
+    var val = 0, bits = 0;
+
+    for (let c of s) {
+        if (c < '+' || c > 'z') break;
+        const ci = c.charCodeAt(0) - '+'.charCodeAt(0);
+        if (fromBase64[ci] >= 64) break;
+        val = (val << 6) + fromBase64[ci];
+        bits += 6;
+        if (bits >= 8) {
+            out.push((val >> (bits - 8)) & 0xFF);
+            bits -= 8;
+        }
+    }
+
+    if (bits > 0) {
+        out.push((val << (8 - bits)) & 0xFF);
+    }
+
+    return out;
+}
+
+function loadProgramFromBase64String(programString) {
+    const bytes = b64_decode(programString);
+    const w = bytes[0] >> 4;
+    const h = bytes[0] % 16;
+
+    var col = 0, row = h - 1;
+    var program = new Program(w, h);
+
+    var p = 1, shift = 6;
+    var byte = bytes[p];
+
+    while (row >= 0) {
+        program.setInstruction(col, row, (byte >> shift) & 0x3);
+
+        if (++col == w) {
+            --row;
+            col = 0;
+        }
+
+        if (shift == 0) {
+            shift = 6;
+            byte = bytes[++p];
+        } else {
+            shift -= 2;
         }
     }
 
@@ -943,8 +1004,8 @@ function init() {
         console.info("Loading from web string");
         program = loadProgramFromWebString(programString);
     } else {
-        console.info("Loading from base-27 string")
-        program = loadProgramFromBase27String(programString);
+        console.info("Loading from base-64 string")
+        program = loadProgramFromBase64String(programString);
     }
     program.dump();
 
