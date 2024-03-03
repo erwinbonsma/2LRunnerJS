@@ -491,6 +491,7 @@ function Computer(datasize, program) {
 
     this.data = new Data(datasize);
     this.pathTracker = new PathTracker(program.width, program.height);
+    this.cursor = new Cursor(program);
 
     this.reset();
 }
@@ -693,7 +694,7 @@ ProgramViewer.prototype.calculateScale = function() {
 
     this.drawSep = (hsep < vsep) ? hsep : vsep;
     this.drawR = 0.4 * this.drawSep;
-    this.ppR = 0.2 * this.drawSep;
+    this.ppR = 0.3 * this.drawSep;
     this.ppW = 1.0 * this.ppR;
 }
 
@@ -778,7 +779,6 @@ ProgramViewer.prototype.drawGrid = function() {
     this.ctx.strokeStyle = "#808080";
 
     const program = this.computer.program;
-    console.log(`w=${program.width}, h=${program.height}`)
     for (var col = 0; col < program.width; col++) {
         this.drawGridLine(col, 0, col, program.height - 1);
     }
@@ -843,12 +843,20 @@ ProgramViewer.prototype.drawNumSteps = function() {
     this.ctx.fillText(s, this.canvas.width - w, this.canvas.height);
 }
 
+ProgramViewer.prototype.drawCursor = function() {
+    const x = this.getX(this.computer.cursor.col);
+    const y = this.getY(this.computer.cursor.row);
+    this.ctx.fillStyle = "#FF0000";
+    this.ctx.fillRect(x - 3, y - 3, 6, 6);
+}
+
 ProgramViewer.prototype.draw = function() {
-    if (this.computer.numSteps == this.prevDrawSteps) {
+    const editing = this.computer.cursor.enabled;
+
+    if (!editing && this.computer.numSteps == this.prevDrawSteps) {
         // Nothing has changed. No need to redraw.
         return;
     }
-    this.prevDrawSteps = this.computer.numSteps;
 
     // Clear canvas
     this.ctx.fillStyle = "#FFFFFF";
@@ -857,10 +865,69 @@ ProgramViewer.prototype.draw = function() {
     this.drawGrid();
     this.drawPaths();
     this.drawProgram();
-    if (this.computer.status != Status.READY) {
-        this.drawProgramPointer();
-        this.drawNumSteps();
+    if (editing) {
+        this.drawCursor();
+        this.prevDrawSteps = -1;
+    } else {
+        if (this.computer.status != Status.READY) {
+            this.drawProgramPointer();
+            this.drawNumSteps();
+        }
+        this.prevDrawSteps = this.computer.numSteps;
     }
+}
+
+/**
+ * @constructor
+ */
+function Cursor(program) {
+    this.col = 0;
+    this.row = 0;
+    this.program = program;
+    this.enabled = false;
+
+    const me = this;
+    this.keyHandler = function(event) {
+        me._handleKeyEvent(event);
+    }
+}
+
+Cursor.prototype.enable = function() {
+    if (!this.enabled) {
+        this.enabled = true;
+        document.addEventListener("keydown", this.keyHandler);
+    }
+}
+
+Cursor.prototype.disable = function() {
+    if (this.enabled) {
+        this.enabled = false;
+        document.removeEventListener("keydown", this.keyHandler);
+    }
+}
+
+Cursor.prototype._handleKeyEvent = function(event) {
+    const w = this.program.width;
+    const h = this.program.height;
+    if (event.code == "ArrowRight") {
+        this.col = (this.col + 1) % w;
+    }
+    if (event.code == "ArrowLeft") {
+        this.col = (this.col + w - 1) % w;
+    }
+    if (event.code == "ArrowUp") {
+        this.row = (this.row + 1) % h;
+    }
+    if (event.code == "ArrowDown") {
+        this.row = (this.row + h - 1) % h;
+    }
+    if (event.code == "Space") {
+        const ins = this.program.getInstruction(this.col, this.row);
+        this.program.setInstruction(this.col, this.row, (ins + 1) % 3);
+    }
+
+    const ins = this.program.getInstruction(this.col, this.row);
+    console.log(`${this.col},${this.row} = ${ins}`);
 }
 
 /**
@@ -870,7 +937,6 @@ function ComputerControl(model) {
     this.model = model;
     this.programViewer = new ProgramViewer(model);
     this.dataViewer = new DataViewer(model.data);
-
     this.paused = true;
     this.numUpdatesSinceLastPlay = 0;
 
@@ -910,10 +976,11 @@ ComputerControl.prototype._handleDataViewerDrags = function() {
 
 ComputerControl.prototype._updateButtons = function() {
     var runnable = (this.model.status == Status.READY || this.model.status == Status.RUNNING);
-    document.getElementById("reset-button").disabled = (this.model.status == Status.READY);
-    document.getElementById("step-button").disabled = !runnable || !this.paused;
-    document.getElementById("play-button").disabled = !runnable || !this.paused;
-    document.getElementById("pause-button").disabled = this.paused;
+    const editing = this.model.cursor.enabled;
+    document.getElementById("reset-button").disabled = editing || (this.model.status == Status.READY);
+    document.getElementById("step-button").disabled = editing || !runnable || !this.paused;
+    document.getElementById("play-button").disabled = editing || !runnable || !this.paused;
+    document.getElementById("pause-button").disabled = editing || this.paused;
 }
 
 ComputerControl.prototype._update = function() {
@@ -966,6 +1033,14 @@ ComputerControl.prototype.play = function() {
     this.paused = false;
 }
 
+ComputerControl.prototype.edit = function() {
+    if (this.model.cursor.enabled) {
+        this.model.cursor.disable();
+    } else {
+        this.model.cursor.enable();
+    }
+}
+
 ComputerControl.prototype.pause = function() {
     this.paused = true;
 }
@@ -998,15 +1073,22 @@ ComputerControl.prototype.dump = function() {
 function init() {
     const urlParams = new URLSearchParams(window.location.search);
 
-    const programString = urlParams.get('p') || "*_*__o___*o____o*_ooo__*_";
     var program;
-    if (programString.includes("*")) {
-        console.info("Loading from web string");
-        program = loadProgramFromWebString(programString);
+
+    const programString = urlParams.get('p');
+    if (programString) {
+        if (programString.includes("*")) {
+            console.info("Loading from web string");
+            program = loadProgramFromWebString(programString);
+        } else {
+            console.info("Loading from base-64 string")
+            program = loadProgramFromBase64String(programString);
+        }
     } else {
-        console.info("Loading from base-64 string")
-        program = loadProgramFromBase64String(programString);
+        const size = parseInt(urlParams.get('s')) || 9;
+        program = new Program(size, size);
     }
+
     program.dump();
 
     var computer = new Computer(8192, program);
@@ -1039,6 +1121,7 @@ var computerControl = init();
 window["computerControl"] = computerControl;
 ComputerControl.prototype["step"] = ComputerControl.prototype.step;
 ComputerControl.prototype["play"] = ComputerControl.prototype.play;
+ComputerControl.prototype["edit"] = ComputerControl.prototype.edit;
 ComputerControl.prototype["pause"] = ComputerControl.prototype.pause;
 ComputerControl.prototype["reset"] = ComputerControl.prototype.reset;
 ComputerControl.prototype["updateRunSpeed"] = ComputerControl.prototype.updateRunSpeed;
