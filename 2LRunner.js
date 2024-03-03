@@ -694,7 +694,7 @@ ProgramViewer.prototype.calculateScale = function() {
 
     this.drawSep = (hsep < vsep) ? hsep : vsep;
     this.drawR = 0.4 * this.drawSep;
-    this.ppR = 0.3 * this.drawSep;
+    this.ppR = 0.25 * this.drawSep;
     this.ppW = 1.0 * this.ppR;
 }
 
