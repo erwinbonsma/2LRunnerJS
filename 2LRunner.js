@@ -34,6 +34,7 @@ const fromBase64 = [
     255, 255, 255, 255, 63,  255, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
     36,  37,  38,  39,  40,  41,  42, 43, 44, 45, 46, 47, 48, 49, 50, 51
 ];
+const toBase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /**
  * @constructor
@@ -483,6 +484,30 @@ function loadProgramFromBase64String(programString) {
     return program;
 }
 
+function base64StringForProgram(program) {
+    var val = program.width * 16 + program.height;
+    var bits = 2;
+    var s = toBase64[(val >> bits) & 0x3f];
+
+    for (var row = program.height; --row >= 0; ) {
+        for (var col = 0; col < program.width; col++) {
+            val = (val << 2) | program.getInstruction(col, row);
+            bits += 2;
+
+            if (bits >= 6) {
+                bits -= 6;
+                s += toBase64[(val >> bits) & 0x3f];
+            }
+        }
+    }
+
+    if (bits > 0) {
+        s += toBase64[(val << (6 - bits)) & 0x3f];
+    }
+
+    return s;
+}
+
 /**
  * @constructor
  */
@@ -924,10 +949,9 @@ Cursor.prototype._handleKeyEvent = function(event) {
     if (event.code == "Space") {
         const ins = this.program.getInstruction(this.col, this.row);
         this.program.setInstruction(this.col, this.row, (ins + 1) % 3);
-    }
 
-    const ins = this.program.getInstruction(this.col, this.row);
-    console.log(`${this.col},${this.row} = ${ins}`);
+        console.log(base64StringForProgram(this.program));
+    }
 }
 
 /**
