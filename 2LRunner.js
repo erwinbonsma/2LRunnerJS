@@ -332,19 +332,23 @@ function Program(width, height) {
     }
 }
 
+Program.prototype.isPositionValid = function(col, row) {
+    return (col >= 0 && col < this.width && row >= 0 && row < this.height);
+}
+
 Program.prototype.getInstruction = function(col, row) {
-    if (col < 0 || col >= this.width || row < 0 || row >= this.height) {
-        return Instruction.DONE;
-    } else {
+    if (this.isPositionValid(col, row)) {
         return this.instructions[col][row];
+    } else {
+        return Instruction.DONE;
     }
 }
 
 Program.prototype.setInstruction = function(col, row, ins) {
-    if (col < 0 || col >= this.width || row < 0 || row >= this.height) {
-        console.warn("Instruction out of bounds");
-    } else {
+    if (this.isPositionValid(col, row)) {
         this.instructions[col][row] = ins;
+    } else {
+        console.warn("Instruction out of bounds");
     }
 }
 
@@ -516,7 +520,7 @@ function Computer(datasize, program) {
 
     this.data = new Data(datasize);
     this.pathTracker = new PathTracker(program.width, program.height);
-    this.cursor = new Cursor(program);
+    this.cursor = new Cursor();
 
     this.reset();
 }
@@ -749,6 +753,14 @@ ProgramViewer.prototype.getY = function(row) {
     }
 }
 
+ProgramViewer.prototype.getCol = function(x) {
+    return Math.round(x / this.drawSep) - 1;
+}
+
+ProgramViewer.prototype.getRow = function(y) {
+    return this.computer.program.height - Math.round(y / this.drawSep);
+}
+
 ProgramViewer.prototype.drawLine = function(x1, y1, x2, y2) {
     this.ctx.beginPath();
     this.ctx.moveTo(x1, y1);
@@ -905,52 +917,65 @@ ProgramViewer.prototype.draw = function() {
 /**
  * @constructor
  */
-function Cursor(program) {
+function Cursor() {
     this.col = 0;
     this.row = 0;
-    this.program = program;
     this.enabled = false;
+}
+
+function CursorControl(model, program, programViewer) {
+    this.model = model;
+    this.program = program;
+    this.programViewer = programViewer;
 
     const me = this;
-    this.keyHandler = function(event) {
+    document.addEventListener("keydown", function(event) {
         me._handleKeyEvent(event);
-    }
+    });
+    this.programViewer.canvas.addEventListener("click", function(event) {
+        me._handleClickEvent(event);
+    });
 }
 
-Cursor.prototype.enable = function() {
-    if (!this.enabled) {
-        this.enabled = true;
-        document.addEventListener("keydown", this.keyHandler);
-    }
+CursorControl.prototype._changeInstruction = function(col, row) {
+    const ins = this.program.getInstruction(col, row);
+    this.program.setInstruction(col, row, (ins + 1) % 3);
+
+    console.log(base64StringForProgram(this.program));
 }
 
-Cursor.prototype.disable = function() {
-    if (this.enabled) {
-        this.enabled = false;
-        document.removeEventListener("keydown", this.keyHandler);
-    }
-}
+CursorControl.prototype._handleKeyEvent = function(event) {
+    if (!this.model.enabled) return;
 
-Cursor.prototype._handleKeyEvent = function(event) {
     const w = this.program.width;
     const h = this.program.height;
+    const cursor = this.model;
     if (event.code == "ArrowRight") {
-        this.col = (this.col + 1) % w;
+        cursor.col = (cursor.col + 1) % w;
     }
     if (event.code == "ArrowLeft") {
-        this.col = (this.col + w - 1) % w;
+        cursor.col = (cursor.col + w - 1) % w;
     }
     if (event.code == "ArrowUp") {
-        this.row = (this.row + 1) % h;
+        cursor.row = (cursor.row + 1) % h;
     }
     if (event.code == "ArrowDown") {
-        this.row = (this.row + h - 1) % h;
+        cursor.row = (cursor.row + h - 1) % h;
     }
     if (event.code == "Space") {
-        const ins = this.program.getInstruction(this.col, this.row);
-        this.program.setInstruction(this.col, this.row, (ins + 1) % 3);
+        this._changeInstruction(cursor.col, cursor.row);
+    }
+}
 
-        console.log(base64StringForProgram(this.program));
+CursorControl.prototype._handleClickEvent = function(event) {
+    if (!this.model.enabled) return;
+
+    const col = this.programViewer.getCol(event.offsetX);
+    const row = this.programViewer.getRow(event.offsetY);
+    console.log(`x,y=${event.offsetX},${event.offsetY} => ${col},${row}`);
+
+    if (this.program.isPositionValid(col, row)) {
+        this._changeInstruction(col, row);
     }
 }
 
@@ -961,6 +986,7 @@ function ComputerControl(model) {
     this.model = model;
     this.programViewer = new ProgramViewer(model);
     this.dataViewer = new DataViewer(model.data);
+    this.cursorControl = new CursorControl(model.cursor, model.program, this.programViewer);
     this.paused = true;
     this.numUpdatesSinceLastPlay = 0;
 
@@ -1058,11 +1084,7 @@ ComputerControl.prototype.play = function() {
 }
 
 ComputerControl.prototype.edit = function() {
-    if (this.model.cursor.enabled) {
-        this.model.cursor.disable();
-    } else {
-        this.model.cursor.enable();
-    }
+    this.model.cursor.enabled = !this.model.cursor.enabled;
 }
 
 ComputerControl.prototype.pause = function() {
