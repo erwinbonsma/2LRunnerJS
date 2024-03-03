@@ -932,7 +932,7 @@ function CursorControl(model, program, programViewer) {
     document.addEventListener("keydown", function(event) {
         me._handleKeyEvent(event);
     });
-    this.programViewer.canvas.addEventListener("click", function(event) {
+    document.addEventListener("click", function(event) {
         me._handleClickEvent(event);
     });
 }
@@ -970,9 +970,13 @@ CursorControl.prototype._handleKeyEvent = function(event) {
 CursorControl.prototype._handleClickEvent = function(event) {
     if (!this.model.enabled) return;
 
-    const col = this.programViewer.getCol(event.offsetX);
-    const row = this.programViewer.getRow(event.offsetY);
-    console.log(`x,y=${event.offsetX},${event.offsetY} => ${col},${row}`);
+    const rect = this.programViewer.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    const col = this.programViewer.getCol(x);
+    const row = this.programViewer.getRow(y);
+    console.log(`x,y=${x},${y} => ${col},${row}`);
 
     if (this.program.isPositionValid(col, row)) {
         this._changeInstruction(col, row);
