@@ -1135,8 +1135,16 @@ function init() {
             program = loadProgramFromBase64String(programString);
         }
     } else {
-        const size = parseInt(urlParams.get('s')) || 9;
-        program = new Program(size, size);
+        const sizeString = urlParams.get('s');
+        if (sizeString.includes("x")) {
+            const sizes = sizeString.split('x');
+            const w = parseInt(sizes[0]);
+            const h = parseInt(sizes[1]);
+            program = new Program(w, h);
+        } else {
+            const size = parseInt(urlParams.get('s')) || 9;
+            program = new Program(size, size);
+        }
     }
 
     program.dump();
