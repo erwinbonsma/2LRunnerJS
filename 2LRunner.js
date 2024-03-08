@@ -1035,6 +1035,7 @@ ComputerControl.prototype._updateButtons = function() {
     document.getElementById("step-button").disabled = editing || !runnable || !this.paused;
     document.getElementById("play-button").disabled = editing || !runnable || !this.paused;
     document.getElementById("pause-button").disabled = editing || this.paused;
+    document.getElementById("edit-button").disabled = (this.model.status == Status.RUNNING) && !this.paused;
 }
 
 ComputerControl.prototype._update = function() {
