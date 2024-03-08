@@ -1031,14 +1031,21 @@ ComputerControl.prototype._handleDataViewerDrags = function() {
     }
 }
 
+ComputerControl.prototype._disableButton = function(buttonId, disabled) {
+    const button = document.getElementById(buttonId);
+    if (button) {
+        button.disabled = disabled;
+    }
+}
+
 ComputerControl.prototype._updateButtons = function() {
     var runnable = (this.model.status == Status.READY || this.model.status == Status.RUNNING);
     const editing = this.model.cursor.enabled;
-    document.getElementById("reset-button").disabled = editing || (this.model.status == Status.READY);
-    document.getElementById("step-button").disabled = editing || !runnable || !this.paused;
-    document.getElementById("play-button").disabled = editing || !runnable || !this.paused;
-    document.getElementById("pause-button").disabled = editing || this.paused;
-    document.getElementById("edit-button").disabled = (this.model.status == Status.RUNNING) && !this.paused;
+    this._disableButton("reset-button", editing || (this.model.status == Status.READY));
+    this._disableButton("step-button", editing || !runnable || !this.paused);
+    this._disableButton("play-button", editing || !runnable || !this.paused);
+    this._disableButton("pause-button", editing || this.paused);
+    this._disableButton("edit-button", (this.model.status == Status.RUNNING) && !this.paused);
 }
 
 ComputerControl.prototype._update = function() {
