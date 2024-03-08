@@ -725,40 +725,43 @@ ProgramViewer.prototype.calculateScale = function() {
     this.drawR = 0.4 * this.drawSep;
     this.ppR = 0.25 * this.drawSep;
     this.ppW = 1.0 * this.ppR;
+
+    this.x0 = (this.canvas.width - this.drawSep * (program.width + 1)) / 2;
+    this.y0 = (this.canvas.height - this.drawSep * (program.height + 1)) / 2;
 }
 
 ProgramViewer.prototype.getX = function(col) {
     const program = this.computer.program;
     if (col < 0) {
-        return 0.4 * this.drawSep;
+        return this.x0 + 0.4 * this.drawSep;
     }
     else if (col >= program.width) {
-        return (program.width + 0.6) * this.drawSep;
+        return this.x0 + (program.width + 0.6) * this.drawSep;
     }
     else {
-        return (col + 1) * this.drawSep;
+        return this.x0 + (col + 1) * this.drawSep;
     }
 }
 
 ProgramViewer.prototype.getY = function(row) {
     const program = this.computer.program;
     if (row < 0) {
-        return (program.height + 0.6) * this.drawSep;
+        return this.y0 + (program.height + 0.6) * this.drawSep;
     }
     else if (row >= program.height) {
-        return 0.4 * this.drawSep;
+        return this.y0 + 0.4 * this.drawSep;
     }
     else {
-        return (program.height - row) * this.drawSep;
+        return this.y0 + (program.height - row) * this.drawSep;
     }
 }
 
 ProgramViewer.prototype.getCol = function(x) {
-    return Math.round(x / this.drawSep) - 1;
+    return Math.round((x - this.x0) / this.drawSep) - 1;
 }
 
 ProgramViewer.prototype.getRow = function(y) {
-    return this.computer.program.height - Math.round(y / this.drawSep);
+    return this.computer.program.height - Math.round((y - this.y0) / this.drawSep);
 }
 
 ProgramViewer.prototype.drawLine = function(x1, y1, x2, y2) {
