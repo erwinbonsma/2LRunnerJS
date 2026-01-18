@@ -1162,7 +1162,7 @@ function init() {
 
     program.dump();
 
-    var computer = new Computer(8192, program);
+    var computer = new Computer(16384, program);
 
     return new ComputerControl(computer);
 }
