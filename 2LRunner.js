@@ -14,7 +14,8 @@ const Status = {
     READY: 0,
     RUNNING: 1,
     DONE: 2,
-    ERROR: 3
+    ERROR: 3,
+    HANG: 4
 };
 const dx = [0, 1, 0, -1];
 const dy = [1, 0, -1, 0];
@@ -75,8 +76,6 @@ function Data(size) {
 Data.prototype.reset = function() {
     this.minBound = 0;
     this.maxBound = 0;
-    this.minValue = 0;
-    this.maxValue = 0;
     this.data = [];
     this.data[0] = 0;
     this.dp = 0;
@@ -94,46 +93,52 @@ Data.prototype.valueAt = function(index) {
     return this.data[index];
 }
 
-Data.prototype.inc = function() {
-    this.data[this.dp] += 1;
+Data.prototype.delta = function(amount) {
+    this.data[this.dp] += amount;
     this.changeCount++;
-    this.maxValue = Math.max(this.data[this.dp], this.maxValue);
+}
+
+Data.prototype.inc = function() {
+    this.delta(1);
 }
 
 Data.prototype.dec = function() {
-    this.data[this.dp] -= 1;
-    this.changeCount++;
-    this.minValue = Math.min(this.data[this.dp], this.minValue);
+    this.delta(-1);
 }
 
-Data.prototype.shr = function() {
-    this.dp++;
+Data.prototype.shift = function(amount) {
+    this.dp += amount;
     this.changeCount++;
     if (this.dp > this.maxBound) {
         if (this.maxBound - this.minBound < this.size) {
-            this.maxBound = this.dp;
-            this.data[this.dp] = 0;
+            while (this.maxBound < this.dp) {
+                this.maxBound++;
+                this.data[this.maxBound] = 0;
+            }
         } else {
             console.log("Data limit reached");
             return false;
         }
     }
-    return true;
+    if (this.dp < this.minBound) {
+        if (this.maxBound - this.minBound < this.size) {
+            while (this.minBound > this.dp) {
+                this.minBound--;
+                this.data[this.minBound] = 0;
+            }
+        } else {
+            console.log("Data limit reached");
+            return false;
+        }
+    }
+}
+
+Data.prototype.shr = function() {
+    return this.shift(1);
 }
 
 Data.prototype.shl = function() {
-    this.dp--;
-    this.changeCount++;
-    if (this.dp < this.minBound) {
-        if (this.maxBound - this.minBound < this.size) {
-            this.minBound = this.dp;
-            this.data[this.dp] = 0;
-        } else {
-            console.log("Data limit reached");
-            return false;
-        }
-    }
-    return true;
+    return this.shift(-1);
 }
 
 Data.prototype.toString = function() {
@@ -514,6 +519,70 @@ function base64StringForProgram(program) {
     return s;
 }
 
+
+function ProgramBlock(startPointer) {
+    this.startPointer = startPointer;
+    this.finalized = false;
+}
+
+ProgramBlock.prototype.finalizeHang = function() {
+    this.instructionAmount = 0;
+    this.numSteps = -1;
+
+    this.finalized = true;
+}
+
+ProgramBlock.prototype.finalizeExit = function(numSteps) {
+    this.instructionAmount = 0;
+    this.numSteps = numSteps;
+
+    this.finalized = true;
+}
+
+ProgramBlock.prototype.finalize = function(
+    isDelta, amount, numSteps, zeroBlock, nonZeroBlock
+) {
+    this.instructionAmount = amount;
+    this.isDelta = isDelta;
+    this.numSteps = numSteps;
+    this.zeroBlock = zeroBlock;
+    this.nonZeroBlock = nonZeroBlock;
+
+    this.finalized = true;
+}
+
+ProgramBlock.prototype.isHang = function() {
+    return this.numSteps < 0;
+}
+
+ProgramBlock.prototype.isExit = function() {
+    return this.numSteps == 0;
+}
+
+
+function InterpretedProgram() {
+    this.startBlock = ProgramBlock(null);
+    this.zeroBlocks = [];
+    this.nonZeroBlocks = [];
+}
+
+InterpretedProgram.prototype.addZeroBlock = function(block) {
+    this.zeroBlocks[block.pp.col + block.pp.row * 16] = block;
+}
+
+InterpretedProgram.prototype.addNonZeroBlock = function(block) {
+    this.nonZeroBlocks[block.pp.col + block.pp.row * 16] = block;
+}
+
+InterpretedProgram.prototype.zeroBlockAt = function(pp) {
+    return this.zeroBlocks[pp.col + pp.row * 16];
+}
+
+InterpretedProgram.prototype.nonZeroBlockAt = function(pp) {
+    return this.zeroBlocks[pp.col + pp.row * 16];
+}
+
+
 /**
  * @constructor
  */
@@ -533,16 +602,10 @@ Computer.prototype.reset = function() {
     this.status = Status.READY;
     this.numSteps = 0;
     this.pathTracker.reset();
+    this.programBlock = null;
 }
 
-Computer.prototype.step = function() {
-    if (this.status == Status.READY) {
-        this.status = Status.RUNNING;
-    }
-    if (this.status != Status.RUNNING) {
-        return;
-    }
-
+Computer.prototype._slowStep = function() {
     var col, row;
     var instruction;
 
@@ -591,9 +654,81 @@ Computer.prototype.step = function() {
         // Do not count first and last step, as they are out of bounds
         this.pathTracker.trackMoveStep(this.pp);
     }
+
     this.pp.col = col;
     this.pp.row = row;
     this.numSteps++;
+}
+
+Computer.prototype._fastStep = function() {
+    if (!this.programBlock.finalized) {
+        console.log("Encountered non-finalized instruction");
+        this.status = ERROR;
+        return;
+    }
+
+    if (this.programBlock.isHang()) {
+        this.status = Status.HANG;
+        return;
+    }
+
+    this.numSteps += this.programBlock.numSteps();
+    if (this.programBlock.isExit()) {
+        this.status = Status.DONE;
+        return;
+    }
+
+    if (this.programBlock.isDelta) {
+        this.data.delta(this.programBlock.amount);
+    } else {
+        if (!this.data.shift(this.programBlock.amount)) {
+            this.status = Status.ERROR;
+            return;
+        }
+    }
+
+    this.programBlock = (
+        this.data.value() == 0
+        ? this.programBlock.zeroBlock
+        : this.programBlock.nonZeroBlock
+    );
+
+    // TODO: Update pathTracker
+}
+
+Computer.prototype.step = function(numBlocks) {
+    numBlocks = numBlocks ?? 0;
+
+    if (this.status == Status.READY) {
+        this.status = Status.RUNNING;
+    }
+    if (this.status != Status.RUNNING) {
+        return;
+    }
+
+    if (numBlocks == 0) {
+        if (this.pp == null) {
+            // Switch to slow execution mode
+            this.pp = this.programBlock.startPointer.copy();
+            this.programBlock = null;
+        }
+
+        this._slowStep();
+    } else {
+        if (this.programBlock == null) {
+            // Switch to fast execution mode
+            do {
+                this.programBlock = this.interpretedProgram.blockAt(
+                    this.pp, this.data.value() == 0
+                );
+            } while (!this.programBlock);
+            this.pp = null;
+        }
+
+        for (var i = 0; i < numBlocks; i++) {
+            this._fastStep();
+        }
+    }
 }
 
 /**
@@ -1071,23 +1206,18 @@ ComputerControl.prototype._postStep = function() {
         const data = this.model.data;
         console.log(
             `steps = ${this.model.numSteps}, ` +
-            `minValue = ${data.minValue}, ` +
-            `maxValue = ${data.maxValue}, ` +
             `dataSize = ${data.maxBound - data.minBound + 1}`
         );
     }
 }
 
 ComputerControl.prototype.step = function() {
-    this.model.step();
+    this.model.step(0);
     this._postStep();
 }
 
 ComputerControl.prototype._playTick = function() {
-    var numSteps = this.stepsPerPlay;
-    while (numSteps-- > 0) {
-        this.model.step();
-    }
+    this.model.step(this.stepsPerPlay);
     this._postStep();
 }
 
@@ -1113,7 +1243,7 @@ ComputerControl.prototype._setRunSpeed = function(speed) {
 
     if (speed < unitRunSpeed) {
         this.playPeriod = 1 << (unitRunSpeed - speed);
-        this.stepsPerPlay = 1;
+        this.stepsPerPlay = 0;
     } else {
         this.playPeriod = 1;
         this.stepsPerPlay = 1 << (speed - unitRunSpeed);
