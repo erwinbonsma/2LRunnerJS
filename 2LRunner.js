@@ -77,6 +77,13 @@ ProgramPointer.prototype.turnClockwise = function() {
     this.dir = (this.dir + 1) % 4;
 }
 
+ProgramPointer.prototype.nextPos = function() {
+    return new BoardPos(
+        this.pos.col + dx[this.dir],
+        this.pos.row + dy[this.dir]
+    );
+}
+
 ProgramPointer.prototype.nextPointer = function() {
     const next = new ProgramPointer(this.pos, this.dir);
     next.step();
@@ -536,21 +543,25 @@ function base64StringForProgram(program) {
 }
 
 
-function ProgramBlock(startPointer) {
+function ProgramBlock(startPointer, label) {
     this.startPointer = startPointer;
+    this.label = label;
     this.finalized = false;
 }
 
 ProgramBlock.prototype.finalizeHang = function() {
-    this.instructionAmount = 0;
+    this.amount = 0;
     this.numSteps = -1;
 
     this.finalized = true;
 }
 
-ProgramBlock.prototype.finalizeExit = function(numSteps) {
-    this.instructionAmount = 0;
+ProgramBlock.prototype.finalizeExit = function(isDelta, amount, numSteps) {
+    this.amount = amount;
+    this.isDelta = isDelta;
     this.numSteps = numSteps;
+    this.zeroBlock = null;
+    this.nonZeroBlock = null;
 
     this.finalized = true;
 }
@@ -558,7 +569,7 @@ ProgramBlock.prototype.finalizeExit = function(numSteps) {
 ProgramBlock.prototype.finalize = function(
     isDelta, amount, numSteps, zeroBlock, nonZeroBlock
 ) {
-    this.instructionAmount = amount;
+    this.amount = amount;
     this.isDelta = isDelta;
     this.numSteps = numSteps;
     this.zeroBlock = zeroBlock;
@@ -572,23 +583,62 @@ ProgramBlock.prototype.isHang = function() {
 }
 
 ProgramBlock.prototype.isExit = function() {
-    return this.numSteps == 0;
+    return this.numSteps > 0 && this.zeroBlock == null && this.nonZeroBlock == null;
+}
+
+ProgramBlock.prototype.toString = function() {
+    var s = `${this.label}: `;
+
+    if (!this.finalized) {
+        s += "???";
+        return s;
+    }
+
+    if (this.isHang()) {
+        s += "HANG";
+        return s;
+    }
+
+    if (this.isDelta) {
+        s += (this.amount > 0) ? "INC " : "DEC ";
+    } else {
+        s += (this.amount > 0) ? "SHR " : "SHL ";
+    }
+    s += Math.abs(this.amount);
+
+    s += " => ";
+    if (this.isExit()) {
+        s += "EXIT";
+    } else {
+        s += (this.zeroBlock ? this.zeroBlock.label : "-");
+        s += "/";
+        s += (this.nonZeroBlock ? this.nonZeroBlock.label : "-");
+    }
+
+    s += ` (${this.numSteps} steps)`;
+
+    return s;
 }
 
 
 function InterpretedProgram(width) {
     this.width = width ?? 16;
-    this.startBlock = new ProgramBlock(new ProgramPointer());
+    this.startBlock = new ProgramBlock(new ProgramPointer(), 0);
     this.zeroBlocks = [];
     this.nonZeroBlocks = [];
+    this.blocks = [this.startBlock];
 }
 
 InterpretedProgram.prototype.addZeroBlock = function(block) {
-    this.zeroBlocks[block.pp.pos.col + block.pp.pos.row * this.width] = block;
+    const pos = block.startPointer.pos;
+    this.zeroBlocks[pos.col + pos.row * this.width] = block;
+    this.blocks.push(block);
 }
 
 InterpretedProgram.prototype.addNonZeroBlock = function(block) {
-    this.nonZeroBlocks[block.pp.pos.col + block.pp.pos.row * this.width] = block;
+    const pos = block.startPointer.pos;
+    this.nonZeroBlocks[pos.col + pos.row * this.width] = block;
+    this.blocks.push(block);
 }
 
 InterpretedProgram.prototype.zeroBlockAt = function(pp) {
@@ -596,7 +646,155 @@ InterpretedProgram.prototype.zeroBlockAt = function(pp) {
 }
 
 InterpretedProgram.prototype.nonZeroBlockAt = function(pp) {
-    return this.zeroBlocks[pp.pos.col + pp.pos.row * this.width];
+    return this.nonZeroBlocks[pp.pos.col + pp.pos.row * this.width];
+}
+
+InterpretedProgram.prototype.toString = function() {
+    var s = "";
+    for (var block of this.blocks) {
+        s += `${block}\n`;
+    }
+    return s;
+}
+
+
+function Interpreter() {
+}
+
+Interpreter.prototype.buildProgram = function(program) {
+    console.log("building program");
+    this.interpretedProgram = new InterpretedProgram(program.width);
+    this.numBlocks = 1;
+
+    var stack = [];
+    stack.push([this.interpretedProgram.startBlock, false]);
+
+    while (stack.length > 0) {
+        var [block, clockwise] = stack.pop();
+        // console.log(`Popped ${block}`);
+
+        if (!block.finalized) {
+            this._buildBlock(block, clockwise, program);
+
+            if (block.zeroBlock) {
+                stack.push([block.zeroBlock, false]);
+            }
+            if (block.nonZeroBlock) {
+                stack.push([block.nonZeroBlock, true]);
+            }
+        }
+    }
+
+    return this.interpretedProgram;
+}
+
+Interpreter.prototype._setStartDirection = function(pp, clockwise, program) {
+    // Find a turn
+    while (program.getInstruction(pp.nextPos()) != Instruction.TURN) {
+        pp.turnClockwise();
+    }
+
+    // Find the exit direction
+    while (program.getInstruction(pp.nextPos()) == Instruction.TURN) {
+        if (clockwise) {
+            pp.turnClockwise();
+        } else {
+            pp.turnCounterClockwise();
+        }
+    }
+}
+
+Interpreter.prototype._getZeroBlock = function(pp, program, unreachable) {
+    if (unreachable) {
+        return null;
+    }
+
+    var block = this.interpretedProgram.zeroBlockAt(pp);
+
+    if (!block) {
+        const startPointer = pp.copy();
+        this._setStartDirection(startPointer, false, program);
+        block = new ProgramBlock(startPointer, this.numBlocks++);
+
+        this.interpretedProgram.addZeroBlock(block);
+
+        // console.log(`Created zero block: ${block} at ${startPointer}`);
+    }
+
+    return block;
+}
+
+Interpreter.prototype._getNonZeroBlock = function(pp, program) {
+    var block = this.interpretedProgram.nonZeroBlockAt(pp);
+
+    if (!block) {
+        const startPointer = pp.copy();
+        this._setStartDirection(startPointer, true, program);
+        block = new ProgramBlock(startPointer, this.numBlocks++);
+
+        this.interpretedProgram.addNonZeroBlock(block);
+
+        // console.log(`Created non-zero block: ${block} at ${startPointer}`);
+    }
+
+    return block;
+}
+
+Interpreter.prototype._buildBlock = function(block, clockwise, program) {
+    // console.log(`Building block at ${block.startPointer}, clockwise=${clockwise}`);
+
+    var pp = block.startPointer.copy();
+    var numSteps = 0;
+    var dataSeen = false;
+    var amount = 0;
+    var isDelta;
+
+    do {
+        var ins;
+        var ip;
+        do {
+            ip = pp.nextPointer();
+            ins = program.getInstruction(ip.pos);
+
+            switch (ins) {
+                case Instruction.NOOP:
+                    break;
+                case Instruction.DATA:
+                    if (!dataSeen) {
+                        dataSeen = true;
+                        isDelta = (pp.dir == Dir.UP) || (pp.dir == Dir.DOWN);
+                    }
+                    if ((pp.dir == Dir.UP) || (pp.dir == Dir.RIGHT)) {
+                        amount++;
+                    } else {
+                        amount--;
+                    }
+                    break;
+                case Instruction.TURN:
+                    if (dataSeen) {
+                        block.finalize(
+                            isDelta, amount, numSteps,
+                            this._getZeroBlock(pp, program, !clockwise && isDelta),
+                            this._getNonZeroBlock(pp, program)
+                        )
+                        return;
+                    }
+                    if (clockwise) {
+                        pp.turnClockwise();
+                    } else {
+                        pp.turnCounterClockwise();
+                    }
+                    break;
+                case Instruction.DONE:
+                    block.finalizeExit(isDelta, amount, numSteps + 1);
+                    return;
+            }
+        } while (ins == Instruction.TURN);
+
+        pp = ip;
+    } while (numSteps++ < 128);
+
+    block.finalizeHang();
 }
 
 
@@ -1147,6 +1345,7 @@ function ComputerControl(model) {
     this.programViewer = new ProgramViewer(model);
     this.dataViewer = new DataViewer(model.data);
     this.cursorControl = new CursorControl(model.cursor, model.program, this.programViewer);
+    this.interpreter = new Interpreter();
     this.paused = true;
     this.numUpdatesSinceLastPlay = 0;
 
@@ -1248,6 +1447,11 @@ ComputerControl.prototype.play = function() {
 
 ComputerControl.prototype.edit = function() {
     this.model.cursor.enabled = !this.model.cursor.enabled;
+
+    if (!this.model.cursor.enabled) {
+        const interpretedProgram = this.interpreter.buildProgram(this.model.program);
+        console.log(interpretedProgram.toString());
+    }
 }
 
 ComputerControl.prototype.pause = function() {
