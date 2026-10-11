@@ -179,7 +179,7 @@ Data.prototype.dumpStats = function() {
     }
 
     const zeroDp = Math.floor(this.size / 2);
-    console.info(`bounds = [${minBound - zeroDp}, ${maxBound - zeroDp}])`);
+    console.info(`bounds = [${minBound - zeroDp}, ${maxBound - zeroDp}]`);
     console.info(`values = [${minValue}, ${maxValue}]`);
 }
 
@@ -708,7 +708,6 @@ function Interpreter() {
 }
 
 Interpreter.prototype.buildProgram = function(program) {
-    console.log("building program");
     this.interpretedProgram = new InterpretedProgram(program.width);
     this.numBlocks = 1;
 
@@ -992,7 +991,6 @@ Computer.prototype.step = function(numBlocks) {
 
     if (numBlocks == 0) {
         if (this.pp == null) {
-            console.info("Switching to slow execution mode");
             // Switch to slow execution mode
             this.pp = this.programBlock.startPointer.copy();
             this.programBlock = null;
@@ -1001,7 +999,6 @@ Computer.prototype.step = function(numBlocks) {
         this._slowStep();
     } else {
         if (this.programBlock == null) {
-            console.info("Switching to fast execution mode");
             // Switch to fast execution mode
             do {
                 if (this.data.value() == 0) {
@@ -1015,7 +1012,6 @@ Computer.prototype.step = function(numBlocks) {
                 }
                 this._slowStep();
             } while (this.status == Status.RUNNING);
-            console.info(`Resuming at block ${this.programBlock}`);
 
             this.pp = null;
         }
