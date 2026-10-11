@@ -1489,13 +1489,15 @@ ComputerControl.prototype.pause = function() {
 ComputerControl.prototype._setRunSpeed = function(speed) {
     this.runSpeed = speed;
 
-    if (speed < unitRunSpeed) {
+    if (speed <= unitRunSpeed) {
         this.playPeriod = 1 << (unitRunSpeed - speed);
         this.stepsPerPlay = 0;
     } else {
         this.playPeriod = 1;
-        this.stepsPerPlay = 1 << (speed - unitRunSpeed);
+        this.stepsPerPlay = 1 << (speed - unitRunSpeed - 1);
     }
+
+    console.info(`period = ${this.playPeriod}, stepsPerTick = ${this.stepsPerPlay}`);
 }
 
 ComputerControl.prototype.changeRunSpeed = function(delta) {
@@ -1540,7 +1542,7 @@ function init() {
 
     program.dump();
 
-    var computer = new Computer(65536, program);
+    var computer = new Computer(100000, program);
 
     return new ComputerControl(computer);
 }
