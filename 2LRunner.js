@@ -42,15 +42,31 @@ const toBase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 /**
  * @constructor
  */
-function ProgramPointer() {
-    this.col = 0;
-    this.row = -1;
-    this.dir = Dir.UP;
+function BoardPos(col, row) {
+    this.col = col ?? 0;
+    this.row = row ?? 0;
+}
+
+BoardPos.prototype.setNextPos = function(pp) {
+    this.col = pp.pos.col + dx[pp.dir];
+    this.row = pp.pos.row + dy[pp.dir];
+}
+
+BoardPos.prototype.toString = function() {
+    return `BoardPos(col = ${this.col}, row = ${this.row})`;
+}
+
+/**
+ * @constructor
+ */
+function ProgramPointer(pos, dir) {
+    this.pos = pos ? new BoardPos(pos.col, pos.row) : new BoardPos(0, -1);
+    this.dir = dir ?? Dir.UP;
 }
 
 ProgramPointer.prototype.step = function() {
-    this.col += dx[this.dir];
-    this.row += dy[this.dir];
+    this.pos.col += dx[this.dir];
+    this.pos.row += dy[this.dir];
 }
 
 ProgramPointer.prototype.turnCounterClockwise = function() {
@@ -61,8 +77,18 @@ ProgramPointer.prototype.turnClockwise = function() {
     this.dir = (this.dir + 1) % 4;
 }
 
+ProgramPointer.prototype.nextPointer = function() {
+    const next = new ProgramPointer(this.pos, this.dir);
+    next.step();
+    return next;
+}
+
+ProgramPointer.prototype.copy = function() {
+    return new ProgramPointer(this.pos, this.dir);
+}
+
 ProgramPointer.prototype.toString = function() {
-    return "[x = " + this.col + ", y = " + this.row + ", dir = " + this.dir + "]";
+    return `ProgramPointer(pos = ${this.pos}, dir = ${this.dir})`;
 }
 
 /**
@@ -184,10 +210,10 @@ PathTracker.prototype.reset = function() {
 // Invoke just before moving pp one step in current direction.
 PathTracker.prototype.trackMoveStep = function(pp) {
     switch(pp.dir) {
-        case Dir.UP: this.verticalCounts[pp.col][pp.row]++; break;
-        case Dir.DOWN: this.verticalCounts[pp.col][pp.row - 1]++; break;
-        case Dir.RIGHT: this.horizontalCounts[pp.col][pp.row]++; break;
-        case Dir.LEFT: this.horizontalCounts[pp.col - 1][pp.row]++; break;
+        case Dir.UP: this.verticalCounts[pp.pos.col][pp.pos.row]++; break;
+        case Dir.DOWN: this.verticalCounts[pp.pos.col][pp.pos.row - 1]++; break;
+        case Dir.RIGHT: this.horizontalCounts[pp.pos.col][pp.pos.row]++; break;
+        case Dir.LEFT: this.horizontalCounts[pp.pos.col - 1][pp.pos.row]++; break;
     }
 }
 
@@ -327,21 +353,21 @@ function Program(width, height) {
     }
 }
 
-Program.prototype.isPositionValid = function(col, row) {
-    return (col >= 0 && col < this.width && row >= 0 && row < this.height);
+Program.prototype.isPositionValid = function(pos) {
+    return (pos.col >= 0 && pos.col < this.width && pos.row >= 0 && pos.row < this.height);
 }
 
-Program.prototype.getInstruction = function(col, row) {
-    if (this.isPositionValid(col, row)) {
-        return this.instructions[col][row];
+Program.prototype.getInstruction = function(pos) {
+    if (this.isPositionValid(pos)) {
+        return this.instructions[pos.col][pos.row];
     } else {
         return Instruction.DONE;
     }
 }
 
-Program.prototype.setInstruction = function(col, row, ins) {
-    if (this.isPositionValid(col, row)) {
-        this.instructions[col][row] = ins;
+Program.prototype.setInstruction = function(pos, ins) {
+    if (this.isPositionValid(pos)) {
+        this.instructions[pos.col][pos.row] = ins;
     } else {
         console.warn("Instruction out of bounds");
     }
@@ -349,10 +375,11 @@ Program.prototype.setInstruction = function(col, row, ins) {
 
 Program.prototype.dump = function() {
     s = ""
-    for (var row = this.height - 1; row >= 0; --row) {
-        for (var col = 0; col < this.width; ++col) {
-            if (col > 0) s += " ";
-            switch (this.getInstruction(col, row)) {
+    var pos = new BoardPos();
+    for (pos.row = this.height - 1; pos.row >= 0; --pos.row) {
+        for (pos.col = 0; pos.col < this.width; ++pos.col) {
+            if (pos.col > 0) s += " ";
+            switch (this.getInstruction(pos)) {
                 case Instruction.NOOP: s += "_"; break;
                 case Instruction.DATA: s += "o"; break;
                 case Instruction.TURN: s += "*"; break;
@@ -373,7 +400,7 @@ function loadProgramFromWebString(programString) {
     }
 
     var program = new Program(size, size);
-    var col = 0, row = size - 1;
+    var pos = new BoardPos(0, size - 1);
     var i = 0;
 
     while (i < programString.length) {
@@ -384,10 +411,10 @@ function loadProgramFromWebString(programString) {
             case '*': ins = Instruction.TURN; break;
             default: console.warn("Invalid character in program string");
         }
-        program.setInstruction(col++, row, ins);
-        if (col == size) {
-            col = 0;
-            row--;
+        program.setInstruction(pos, ins);
+        if (++pos.col == size) {
+            pos.col = 0;
+            pos.row--;
         }
     }
 
@@ -400,11 +427,11 @@ function loadProgramFromBase27String(programString) {
 
     var program = new Program(w, h);
 
-    var col = 0, row = h - 1;
+    var pos = new BoardPos(0, h - 1);
     var i = 2;
     var v = [];
 
-    while (row >= 0) {
+    while (pos.row >= 0) {
         if (v.length == 0) {
             if (i == programString.length) {
                 console.error("Program string too short");
@@ -419,11 +446,11 @@ function loadProgramFromBase27String(programString) {
             }
         }
 
-        program.setInstruction(col, row, v.pop());
+        program.setInstruction(pos, v.pop());
 
-        if (++col == w) {
-            col = 0;
-            row -= 1;
+        if (++pos.col == w) {
+            pos.col = 0;
+            pos.row--;
         }
     }
 
@@ -458,18 +485,18 @@ function loadProgramFromBase64String(programString) {
     const w = bytes[0] >> 4;
     const h = bytes[0] % 16;
 
-    var col = 0, row = h - 1;
+    var pos = new BoardPos(0, h - 1);
     var program = new Program(w, h);
 
     var p = 1, shift = 6;
     var byte = bytes[p];
 
-    while (row >= 0) {
-        program.setInstruction(col, row, (byte >> shift) & 0x3);
+    while (pos.row >= 0) {
+        program.setInstruction(pos, (byte >> shift) & 0x3);
 
-        if (++col == w) {
-            --row;
-            col = 0;
+        if (++pos.col == w) {
+            pos.row--;
+            pos.col = 0;
         }
 
         if (shift == 0) {
@@ -487,10 +514,11 @@ function base64StringForProgram(program) {
     var val = program.width * 16 + program.height;
     var bits = 2;
     var s = toBase64[(val >> bits) & 0x3f];
+    const pos = new BoardPos();
 
-    for (var row = program.height; --row >= 0; ) {
-        for (var col = 0; col < program.width; col++) {
-            val = (val << 2) | program.getInstruction(col, row);
+    for (pos.row = program.height; --pos.row >= 0; ) {
+        for (pos.col = 0; pos.col < program.width; pos.col++) {
+            val = (val << 2) | program.getInstruction(pos);
             bits += 2;
 
             if (bits >= 6) {
@@ -548,26 +576,27 @@ ProgramBlock.prototype.isExit = function() {
 }
 
 
-function InterpretedProgram() {
-    this.startBlock = ProgramBlock(null);
+function InterpretedProgram(width) {
+    this.width = width ?? 16;
+    this.startBlock = new ProgramBlock(new ProgramPointer());
     this.zeroBlocks = [];
     this.nonZeroBlocks = [];
 }
 
 InterpretedProgram.prototype.addZeroBlock = function(block) {
-    this.zeroBlocks[block.pp.col + block.pp.row * 16] = block;
+    this.zeroBlocks[block.pp.pos.col + block.pp.pos.row * this.width] = block;
 }
 
 InterpretedProgram.prototype.addNonZeroBlock = function(block) {
-    this.nonZeroBlocks[block.pp.col + block.pp.row * 16] = block;
+    this.nonZeroBlocks[block.pp.pos.col + block.pp.pos.row * this.width] = block;
 }
 
 InterpretedProgram.prototype.zeroBlockAt = function(pp) {
-    return this.zeroBlocks[pp.col + pp.row * 16];
+    return this.zeroBlocks[pp.pos.col + pp.pos.row * this.width];
 }
 
 InterpretedProgram.prototype.nonZeroBlockAt = function(pp) {
-    return this.zeroBlocks[pp.col + pp.row * 16];
+    return this.zeroBlocks[pp.pos.col + pp.pos.row * this.width];
 }
 
 
@@ -594,14 +623,13 @@ Computer.prototype.reset = function() {
 }
 
 Computer.prototype._slowStep = function() {
-    var col, row;
+    var pos = new BoardPos();
     var instruction;
 
     do {
-        col = this.pp.col + dx[this.pp.dir];
-        row = this.pp.row + dy[this.pp.dir];
+        pos.setNextPos(this.pp);
 
-        instruction = this.program.getInstruction(col, row);
+        instruction = this.program.getInstruction(pos);
         switch (instruction) {
             case Instruction.NOOP:
                 break;
@@ -643,8 +671,7 @@ Computer.prototype._slowStep = function() {
         this.pathTracker.trackMoveStep(this.pp);
     }
 
-    this.pp.col = col;
-    this.pp.row = row;
+    this.pp.pos = pos;
     this.numSteps++;
 }
 
@@ -908,8 +935,9 @@ ProgramViewer.prototype.drawProgramPointer = function() {
     }
     this.ctx.strokeStyle = "#000000";
 
-    var x = this.getX(this.computer.pp.col);
-    var y = this.getY(this.computer.pp.row);
+    const pos = this.computer.pp.pos;
+    const x = this.getX(pos.col);
+    const y = this.getY(pos.row);
 
     this.ctx.save();
 
@@ -988,13 +1016,14 @@ ProgramViewer.prototype.drawPaths = function() {
 
 ProgramViewer.prototype.drawProgram = function() {
     const program = this.computer.program;
-    for (var col = 0; col < program.width; col++) {
-        for (var row = 0; row < program.height; row++) {
-            var ins = program.getInstruction(col, row);
+    const pos = new BoardPos();
+    for (pos.col = 0; pos.col < program.width; pos.col++) {
+        for (pos.row = 0; pos.row < program.height; pos.row++) {
+            var ins = program.getInstruction(pos);
 
             switch (ins) {
-                case Instruction.DATA: this.drawCircle(col, row, "#FFFFFF"); break;
-                case Instruction.TURN: this.drawCircle(col, row, "#000000"); break;
+                case Instruction.DATA: this.drawCircle(pos.col, pos.row, "#FFFFFF"); break;
+                case Instruction.TURN: this.drawCircle(pos.col, pos.row, "#000000"); break;
             }
         }
     }
@@ -1009,8 +1038,9 @@ ProgramViewer.prototype.drawNumSteps = function() {
 }
 
 ProgramViewer.prototype.drawCursor = function() {
-    const x = this.getX(this.computer.cursor.col);
-    const y = this.getY(this.computer.cursor.row);
+    const pos = this.computer.cursor.pos;
+    const x = this.getX(pos.col);
+    const y = this.getY(pos.row);
     this.ctx.fillStyle = "#FF0000";
     this.ctx.fillRect(x - 3, y - 3, 6, 6);
 }
@@ -1046,8 +1076,7 @@ ProgramViewer.prototype.draw = function() {
  * @constructor
  */
 function Cursor() {
-    this.col = 0;
-    this.row = 0;
+    this.pos = new BoardPos();
     this.enabled = false;
 }
 
@@ -1065,9 +1094,9 @@ function CursorControl(model, program, programViewer) {
     });
 }
 
-CursorControl.prototype._changeInstruction = function(col, row) {
-    const ins = this.program.getInstruction(col, row);
-    this.program.setInstruction(col, row, (ins + 1) % 3);
+CursorControl.prototype._changeInstruction = function(pos) {
+    const ins = this.program.getInstruction(pos);
+    this.program.setInstruction(pos, (ins + 1) % 3);
 
     console.log(base64StringForProgram(this.program));
 }
@@ -1077,21 +1106,21 @@ CursorControl.prototype._handleKeyEvent = function(event) {
 
     const w = this.program.width;
     const h = this.program.height;
-    const cursor = this.model;
+    const pos = this.model.pos;
     if (event.code == "ArrowRight") {
-        cursor.col = (cursor.col + 1) % w;
+        pos.col = (pos.col + 1) % w;
     }
     if (event.code == "ArrowLeft") {
-        cursor.col = (cursor.col + w - 1) % w;
+        pos.col = (pos.col + w - 1) % w;
     }
     if (event.code == "ArrowUp") {
-        cursor.row = (cursor.row + 1) % h;
+        pos.row = (pos.row + 1) % h;
     }
     if (event.code == "ArrowDown") {
-        cursor.row = (cursor.row + h - 1) % h;
+        pos.row = (pos.row + h - 1) % h;
     }
     if (event.code == "Space") {
-        this._changeInstruction(cursor.col, cursor.row);
+        this._changeInstruction(pos);
     }
 }
 
@@ -1102,12 +1131,11 @@ CursorControl.prototype._handleClickEvent = function(event) {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    const col = this.programViewer.getCol(x);
-    const row = this.programViewer.getRow(y);
-    console.log(`x,y=${x},${y} => ${col},${row}`);
+    const pos = new BoardPos(this.programViewer.getCol(x), this.programViewer.getRow(y));
+    console.log(`x,y=${x},${y} => ${pos.col},${pos.row}`);
 
-    if (this.program.isPositionValid(col, row)) {
-        this._changeInstruction(col, row);
+    if (this.program.isPositionValid(pos)) {
+        this._changeInstruction(pos);
     }
 }
 
