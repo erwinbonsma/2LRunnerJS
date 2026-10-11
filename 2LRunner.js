@@ -70,15 +70,16 @@ ProgramPointer.prototype.toString = function() {
  */
 function Data(size) {
     this.size = size;
+    this.data = [];
+    this.data.length = size;
+    this.minBound = 0;
+    this.maxBound = size - 1;
     this.reset();
 }
 
 Data.prototype.reset = function() {
-    this.minBound = 0;
-    this.maxBound = 0;
-    this.data = [];
-    this.data[0] = 0;
-    this.dp = 0;
+    this.data.fill(0);
+    this.dp = Math.floor(this.size / 2);
     this.changeCount = 0;
 }
 
@@ -110,27 +111,14 @@ Data.prototype.shift = function(amount) {
     this.dp += amount;
     this.changeCount++;
     if (this.dp > this.maxBound) {
-        if (this.maxBound - this.minBound < this.size) {
-            while (this.maxBound < this.dp) {
-                this.maxBound++;
-                this.data[this.maxBound] = 0;
-            }
-        } else {
-            console.log("Data limit reached");
-            return false;
-        }
+        console.log("Data limit reached");
+        return false;
     }
     if (this.dp < this.minBound) {
-        if (this.maxBound - this.minBound < this.size) {
-            while (this.minBound > this.dp) {
-                this.minBound--;
-                this.data[this.minBound] = 0;
-            }
-        } else {
-            console.log("Data limit reached");
-            return false;
-        }
+        console.log("Data limit reached");
+        return false;
     }
+    return true;
 }
 
 Data.prototype.shr = function() {
