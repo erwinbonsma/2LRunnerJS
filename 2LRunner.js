@@ -162,6 +162,27 @@ Data.prototype.shl = function() {
     return this.shift(-1);
 }
 
+Data.prototype.dumpStats = function() {
+    var minBound;
+    var maxBound;
+    var minValue = 0;
+    var maxValue = 0;
+    for (var i = this.minBound; i <= this.maxBound; i++) {
+        if (this.data[i]) {
+            if (!minBound) {
+                minBound = i;
+            }
+            maxBound = i;
+            minValue = Math.min(minValue, this.data[i]);
+            maxValue = Math.max(maxValue, this.data[i]);
+        }
+    }
+
+    const zeroDp = Math.floor(this.size / 2);
+    console.info(`bounds = [${minBound - zeroDp}, ${maxBound - zeroDp}])`);
+    console.info(`values = [${minValue}, ${maxValue}]`);
+}
+
 Data.prototype.toString = function() {
     var s = "";
     var i = this.minBound;
@@ -1482,11 +1503,9 @@ ComputerControl.prototype._postStep = function() {
 
     if (this.model.status != Status.RUNNING) {
         this.paused = true;
-        const data = this.model.data;
-        console.log(
-            `steps = ${this.model.numSteps}, ` +
-            `dataSize = ${data.maxBound - data.minBound + 1}`
-        );
+
+        console.info(`steps = ${this.model.numSteps}`);
+        this.model.data.dumpStats();
     }
 }
 
