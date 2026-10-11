@@ -205,23 +205,49 @@ function PathTracker(width, height) {
     this.reset();
 }
 
-PathTracker.prototype.reset = function() {
+PathTracker.prototype.reset = function(interpretedProgram) {
     for (var x = 0; x < this.width; x++) {
         for (var y = 0; y < this.height; y++) {
             this.horizontalCounts[x][y] = 0;
             this.verticalCounts[x][y] = 0;
         }
     }
+
+    if (interpretedProgram) {
+        this.blockCounts = [];
+        for (var block of interpretedProgram.blocks) {
+            this.blockCounts[block.label] = 0;
+        }
+    } else {
+        this.blockCounts = null;
+    }
+}
+
+PathTracker.prototype.processBlockCounts = function(interpretedProgram) {
+    for (var block of interpretedProgram.blocks) {
+        const delta = this.blockCounts[block.label];
+        if (delta) {
+            for (var step of block.steps) {
+                this.trackMoveStep(step, delta);
+            }
+            this.blockCounts[block.label] = 0;
+        }
+    }
 }
 
 // Invoke just before moving pp one step in current direction.
-PathTracker.prototype.trackMoveStep = function(pp) {
+PathTracker.prototype.trackMoveStep = function(pp, delta) {
+    delta = delta ?? 1;
     switch(pp.dir) {
-        case Dir.UP: this.verticalCounts[pp.pos.col][pp.pos.row]++; break;
-        case Dir.DOWN: this.verticalCounts[pp.pos.col][pp.pos.row - 1]++; break;
-        case Dir.RIGHT: this.horizontalCounts[pp.pos.col][pp.pos.row]++; break;
-        case Dir.LEFT: this.horizontalCounts[pp.pos.col - 1][pp.pos.row]++; break;
+        case Dir.UP: this.verticalCounts[pp.pos.col][pp.pos.row] += delta; break;
+        case Dir.DOWN: this.verticalCounts[pp.pos.col][pp.pos.row - 1] += delta; break;
+        case Dir.RIGHT: this.horizontalCounts[pp.pos.col][pp.pos.row] += delta; break;
+        case Dir.LEFT: this.horizontalCounts[pp.pos.col - 1][pp.pos.row] += delta; break;
     }
+}
+
+PathTracker.prototype.trackBlockExecution = function(block) {
+    this.blockCounts[block.label]++;
 }
 
 PathTracker.prototype.getHorizontalVisitCount = function(x, y) {
@@ -747,6 +773,7 @@ Interpreter.prototype._buildBlock = function(block, clockwise, program) {
     var dataSeen = false;
     var amount = 0;
     var isDelta;
+    var steps = [];
 
     do {
         var ins;
@@ -776,6 +803,11 @@ Interpreter.prototype._buildBlock = function(block, clockwise, program) {
                             this._getZeroBlock(pp, program, !clockwise && isDelta),
                             this._getNonZeroBlock(pp, program)
                         )
+                        if (block == this.interpretedProgram.startBlock) {
+                            block.steps = steps.slice(1);
+                        } else {
+                            block.steps = steps;
+                        }
                         return;
                     }
                     if (clockwise) {
@@ -786,10 +818,12 @@ Interpreter.prototype._buildBlock = function(block, clockwise, program) {
                     break;
                 case Instruction.DONE:
                     block.finalizeExit(isDelta, amount, numSteps + 1, ip);
+                    block.steps = steps;
                     return;
             }
         } while (ins == Instruction.TURN);
 
+        steps.push(pp);
         pp = ip;
     } while (numSteps++ < 128);
 
@@ -809,8 +843,8 @@ function Computer(datasize, program) {
 
     this.interpreter = new Interpreter();
 
-    this.reset();
     this.rebuild();
+    this.reset();
 }
 
 Computer.prototype.reset = function() {
@@ -818,7 +852,7 @@ Computer.prototype.reset = function() {
     this.pp = new ProgramPointer();
     this.status = Status.READY;
     this.numSteps = 0;
-    this.pathTracker.reset();
+    this.pathTracker.reset(this.interpretedProgram);
     this.programBlock = null;
 }
 
@@ -897,6 +931,8 @@ Computer.prototype._fastStep = function() {
     }
 
     this.numSteps += this.programBlock.numSteps;
+    this.pathTracker.trackBlockExecution(this.programBlock);
+
     if (this.programBlock.isExit()) {
         this.pp = this.programBlock.endPointer;
         this.programBlock = null;
@@ -919,8 +955,6 @@ Computer.prototype._fastStep = function() {
         ? this.programBlock.zeroBlock
         : this.programBlock.nonZeroBlock
     );
-
-    // TODO: Update pathTracker
 
     return true;
 }
@@ -1443,6 +1477,7 @@ ComputerControl.prototype._update = function() {
 }
 
 ComputerControl.prototype._postStep = function() {
+    this.model.pathTracker.processBlockCounts(this.model.interpretedProgram);
     this.model.pathTracker.rankVisitCounts();
 
     if (this.model.status != Status.RUNNING) {
