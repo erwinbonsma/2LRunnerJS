@@ -556,12 +556,11 @@ ProgramBlock.prototype.finalizeHang = function() {
     this.finalized = true;
 }
 
-ProgramBlock.prototype.finalizeExit = function(isDelta, amount, numSteps) {
+ProgramBlock.prototype.finalizeExit = function(isDelta, amount, numSteps, endPointer) {
     this.amount = amount;
     this.isDelta = isDelta;
     this.numSteps = numSteps;
-    this.zeroBlock = null;
-    this.nonZeroBlock = null;
+    this.endPointer = endPointer;
 
     this.finalized = true;
 }
@@ -583,7 +582,7 @@ ProgramBlock.prototype.isHang = function() {
 }
 
 ProgramBlock.prototype.isExit = function() {
-    return this.numSteps > 0 && this.zeroBlock == null && this.nonZeroBlock == null;
+    return !!this.endPointer;
 }
 
 ProgramBlock.prototype.toString = function() {
@@ -641,12 +640,12 @@ InterpretedProgram.prototype.addNonZeroBlock = function(block) {
     this.blocks.push(block);
 }
 
-InterpretedProgram.prototype.zeroBlockAt = function(pp) {
-    return this.zeroBlocks[pp.pos.col + pp.pos.row * this.width];
+InterpretedProgram.prototype.zeroBlockAt = function(pos) {
+    return this.zeroBlocks[pos.col + pos.row * this.width];
 }
 
-InterpretedProgram.prototype.nonZeroBlockAt = function(pp) {
-    return this.nonZeroBlocks[pp.pos.col + pp.pos.row * this.width];
+InterpretedProgram.prototype.nonZeroBlockAt = function(pos) {
+    return this.nonZeroBlocks[pos.col + pos.row * this.width];
 }
 
 InterpretedProgram.prototype.toString = function() {
@@ -709,7 +708,7 @@ Interpreter.prototype._getZeroBlock = function(pp, program, unreachable) {
         return null;
     }
 
-    var block = this.interpretedProgram.zeroBlockAt(pp);
+    var block = this.interpretedProgram.zeroBlockAt(pp.pos);
 
     if (!block) {
         const startPointer = pp.copy();
@@ -725,7 +724,7 @@ Interpreter.prototype._getZeroBlock = function(pp, program, unreachable) {
 }
 
 Interpreter.prototype._getNonZeroBlock = function(pp, program) {
-    var block = this.interpretedProgram.nonZeroBlockAt(pp);
+    var block = this.interpretedProgram.nonZeroBlockAt(pp.pos);
 
     if (!block) {
         const startPointer = pp.copy();
@@ -786,7 +785,7 @@ Interpreter.prototype._buildBlock = function(block, clockwise, program) {
                     }
                     break;
                 case Instruction.DONE:
-                    block.finalizeExit(isDelta, amount, numSteps + 1);
+                    block.finalizeExit(isDelta, amount, numSteps + 1, ip);
                     return;
             }
         } while (ins == Instruction.TURN);
@@ -808,7 +807,10 @@ function Computer(datasize, program) {
     this.pathTracker = new PathTracker(program.width, program.height);
     this.cursor = new Cursor();
 
+    this.interpreter = new Interpreter();
+
     this.reset();
+    this.rebuild();
 }
 
 Computer.prototype.reset = function() {
@@ -818,6 +820,15 @@ Computer.prototype.reset = function() {
     this.numSteps = 0;
     this.pathTracker.reset();
     this.programBlock = null;
+}
+
+Computer.prototype.rebuild = function() {
+    this.interpretedProgram = this.interpreter.buildProgram(this.program);
+    console.log(this.interpretedProgram.toString());
+}
+
+Computer.prototype.getProgramPointer = function() {
+    return this.pp ?? this.programBlock.startPointer;
 }
 
 Computer.prototype._slowStep = function() {
@@ -877,18 +888,21 @@ Computer.prototype._fastStep = function() {
     if (!this.programBlock.finalized) {
         console.log("Encountered non-finalized instruction");
         this.status = ERROR;
-        return;
+        return false;
     }
 
     if (this.programBlock.isHang()) {
         this.status = Status.HANG;
-        return;
+        return false;
     }
 
-    this.numSteps += this.programBlock.numSteps();
+    this.numSteps += this.programBlock.numSteps;
     if (this.programBlock.isExit()) {
+        this.pp = this.programBlock.endPointer;
+        this.programBlock = null;
+
         this.status = Status.DONE;
-        return;
+        return false;
     }
 
     if (this.programBlock.isDelta) {
@@ -896,7 +910,7 @@ Computer.prototype._fastStep = function() {
     } else {
         if (!this.data.shift(this.programBlock.amount)) {
             this.status = Status.ERROR;
-            return;
+            return false;
         }
     }
 
@@ -907,6 +921,8 @@ Computer.prototype._fastStep = function() {
     );
 
     // TODO: Update pathTracker
+
+    return true;
 }
 
 Computer.prototype.step = function(numBlocks) {
@@ -921,6 +937,7 @@ Computer.prototype.step = function(numBlocks) {
 
     if (numBlocks == 0) {
         if (this.pp == null) {
+            console.info("Switching to slow execution mode");
             // Switch to slow execution mode
             this.pp = this.programBlock.startPointer.copy();
             this.programBlock = null;
@@ -929,17 +946,29 @@ Computer.prototype.step = function(numBlocks) {
         this._slowStep();
     } else {
         if (this.programBlock == null) {
+            console.info("Switching to fast execution mode");
             // Switch to fast execution mode
             do {
-                this.programBlock = this.interpretedProgram.blockAt(
-                    this.pp, this.data.value() == 0
-                );
-            } while (!this.programBlock);
+                if (this.data.value() == 0) {
+                    this.programBlock = this.interpretedProgram.zeroBlockAt(this.pp.pos);
+                } else {
+                    this.programBlock = this.interpretedProgram.nonZeroBlockAt(this.pp.pos);
+                }
+                if (this.programBlock) {
+                    // Found the start of an instruction block
+                    break;
+                }
+                this._slowStep();
+            } while (this.status == Status.RUNNING);
+            console.info(`Resuming at block ${this.programBlock}`);
+
             this.pp = null;
         }
 
         for (var i = 0; i < numBlocks; i++) {
-            this._fastStep();
+            if (!this._fastStep()) {
+                break;
+            }
         }
     }
 }
@@ -1133,14 +1162,15 @@ ProgramViewer.prototype.drawProgramPointer = function() {
     }
     this.ctx.strokeStyle = "#000000";
 
-    const pos = this.computer.pp.pos;
-    const x = this.getX(pos.col);
-    const y = this.getY(pos.row);
+
+    const pp = this.computer.getProgramPointer();
+    const x = this.getX(pp.pos.col);
+    const y = this.getY(pp.pos.row);
 
     this.ctx.save();
 
     this.ctx.translate(x, y);
-    this.ctx.rotate(0.5 * Math.PI * this.computer.pp.dir);
+    this.ctx.rotate(0.5 * Math.PI * pp.dir);
     this.ctx.translate(0, -0.2 * this.ppR);
 
     this.ctx.beginPath();
@@ -1345,7 +1375,6 @@ function ComputerControl(model) {
     this.programViewer = new ProgramViewer(model);
     this.dataViewer = new DataViewer(model.data);
     this.cursorControl = new CursorControl(model.cursor, model.program, this.programViewer);
-    this.interpreter = new Interpreter();
     this.paused = true;
     this.numUpdatesSinceLastPlay = 0;
 
@@ -1449,8 +1478,7 @@ ComputerControl.prototype.edit = function() {
     this.model.cursor.enabled = !this.model.cursor.enabled;
 
     if (!this.model.cursor.enabled) {
-        const interpretedProgram = this.interpreter.buildProgram(this.model.program);
-        console.log(interpretedProgram.toString());
+        this.model.rebuild();
     }
 }
 
