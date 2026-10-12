@@ -20,7 +20,7 @@ const Status = {
 const dx = [0, 1, 0, -1];
 const dy = [1, 0, -1, 0];
 
-const maxRunSpeed = 20;
+const maxRunSpeed = 16;
 const unitRunSpeed = 5;
 
 const numHeatmapColors = 8;
@@ -1544,7 +1544,7 @@ ComputerControl.prototype._setRunSpeed = function(speed) {
         this.stepsPerPlay = 0;
     } else {
         this.playPeriod = 1;
-        this.stepsPerPlay = 1 << (speed - unitRunSpeed - 1);
+        this.stepsPerPlay = 1 << ((speed - unitRunSpeed - 1) * 2);
     }
 
     console.info(`period = ${this.playPeriod}, stepsPerTick = ${this.stepsPerPlay}`);
