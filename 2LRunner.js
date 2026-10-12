@@ -115,12 +115,15 @@ function Data(size) {
     this.data.length = size;
     this.minBound = 0;
     this.maxBound = size - 1;
+    this.startDp = Math.floor(this.size / 2);
     this.reset();
 }
 
 Data.prototype.reset = function() {
     this.data.fill(0);
-    this.dp = Math.floor(this.size / 2);
+    this.dp = this.startDp;
+    this.minDp = this.dp;
+    this.maxDp = this.dp;
     this.changeCount = 0;
 }
 
@@ -151,14 +154,25 @@ Data.prototype.dec = function() {
 Data.prototype.shift = function(amount) {
     this.dp += amount;
     this.changeCount++;
-    if (this.dp > this.maxBound) {
-        console.log("Data limit reached");
-        return false;
+
+    if (this.dp > this.startDp) {
+        if (this.dp > this.maxDp) {
+            this.maxDp = this.dp;
+            if (this.dp > this.maxBound) {
+                console.log("Data limit reached");
+                return false;
+            }
+        }
+    } else {
+        if (this.dp < this.minDp) {
+            this.minDp = this.dp;
+            if (this.dp < this.minBound) {
+                console.log("Data limit reached");
+                return false;
+            }
+        }
     }
-    if (this.dp < this.minBound) {
-        console.log("Data limit reached");
-        return false;
-    }
+
     return true;
 }
 
@@ -171,23 +185,18 @@ Data.prototype.shl = function() {
 }
 
 Data.prototype.dumpStats = function() {
-    var minBound;
-    var maxBound;
     var minValue = 0;
     var maxValue = 0;
-    for (var i = this.minBound; i <= this.maxBound; i++) {
+    const start = Math.max(this.minDp, this.minBound);
+    const end = Math.min(this.maxDp, this.maxBound);
+    for (var i = start; i <= end; i++) {
         if (this.data[i]) {
-            if (!minBound) {
-                minBound = i;
-            }
-            maxBound = i;
             minValue = Math.min(minValue, this.data[i]);
             maxValue = Math.max(maxValue, this.data[i]);
         }
     }
 
-    const zeroDp = Math.floor(this.size / 2);
-    console.info(`bounds = [${minBound - zeroDp}, ${maxBound - zeroDp}]`);
+    console.info(`bounds = [${this.minDp - this.startDp}, ${this.maxDp - this.startDp}]`);
     console.info(`values = [${minValue}, ${maxValue}]`);
 }
 
