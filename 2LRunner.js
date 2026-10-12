@@ -52,6 +52,10 @@ BoardPos.prototype.setNextPos = function(pp) {
     this.row = pp.pos.row + dy[pp.dir];
 }
 
+BoardPos.prototype.equals = function(other) {
+    return this.prototype === other.prototype && this.col === other.col && this.row === other.row;
+}
+
 BoardPos.prototype.toString = function() {
     return `BoardPos(col = ${this.col}, row = ${this.row})`;
 }
@@ -92,6 +96,10 @@ ProgramPointer.prototype.nextPointer = function() {
 
 ProgramPointer.prototype.copy = function() {
     return new ProgramPointer(this.pos, this.dir);
+}
+
+ProgramPointer.prototype.equals = function(other) {
+    return this.prototype === other.prototype && this.dir === other.dir && this.pos.equals(other.pos);
 }
 
 ProgramPointer.prototype.toString = function() {
@@ -596,9 +604,15 @@ function ProgramBlock(startPointer, label) {
     this.finalized = false;
 }
 
-ProgramBlock.prototype.finalizeHang = function() {
+// A no-data hang typically results in two blocks. One with a start pointer that is not traversed
+// by the hang loop, and the other with purely the hang loop. Both are finalized as Hangs using
+// this method, but the first is rendered as a Noop that next jumps to the pure hang loop.
+ProgramBlock.prototype.finalizeHang = function(numSteps, zeroBlock, nonZeroBlock) {
     this.amount = 0;
-    this.numSteps = -1;
+    this.isDelta = true; // Reduces execution overhead compared to shift
+    this.numSteps = numSteps;
+    this.zeroBlock = zeroBlock;
+    this.nonZeroBlock = nonZeroBlock;
 
     this.finalized = true;
 }
@@ -624,8 +638,13 @@ ProgramBlock.prototype.finalize = function(
     this.finalized = true;
 }
 
+// No-data hangs are NOOPs but exits can be as well
+ProgramBlock.prototype.isNoop = function() {
+    return this.amount === 0;
+}
+
 ProgramBlock.prototype.isHang = function() {
-    return this.numSteps < 0;
+    return this.amount === 0 && (this.zeroBlock === this || this.nonZeroBlock === this);
 }
 
 ProgramBlock.prototype.isExit = function() {
@@ -642,23 +661,26 @@ ProgramBlock.prototype.toString = function() {
 
     if (this.isHang()) {
         s += "HANG";
-        return s;
-    }
-
-    if (this.isDelta) {
-        s += (this.amount > 0) ? "INC " : "DEC ";
     } else {
-        s += (this.amount > 0) ? "SHR " : "SHL ";
-    }
-    s += Math.abs(this.amount);
+        if (this.isNoop()) {
+            s += "NOOP";
+        } else {
+            if (this.isDelta) {
+                s += (this.amount > 0) ? "INC " : "DEC ";
+            } else {
+                s += (this.amount > 0) ? "SHR " : "SHL ";
+            }
+            s += Math.abs(this.amount);
+        }
 
-    s += " => ";
-    if (this.isExit()) {
-        s += "EXIT";
-    } else {
-        s += (this.zeroBlock ? this.zeroBlock.label : "-");
-        s += "/";
-        s += (this.nonZeroBlock ? this.nonZeroBlock.label : "-");
+        s += " => ";
+        if (this.isExit()) {
+            s += "EXIT";
+        } else {
+            s += (this.zeroBlock ? this.zeroBlock.label : "-");
+            s += "/";
+            s += (this.nonZeroBlock ? this.nonZeroBlock.label : "-");
+        }
     }
 
     s += ` (${this.numSteps} steps)`;
@@ -769,7 +791,11 @@ Interpreter.prototype._getZeroBlock = function(pp, program, unreachable) {
     return block;
 }
 
-Interpreter.prototype._getNonZeroBlock = function(pp, program) {
+Interpreter.prototype._getNonZeroBlock = function(pp, program, unreachable) {
+    if (unreachable) {
+        return null;
+    }
+
     var block = this.interpretedProgram.nonZeroBlockAt(pp.pos);
 
     if (!block) {
@@ -822,7 +848,7 @@ Interpreter.prototype._buildBlock = function(block, clockwise, program) {
                             isDelta, amount, numSteps,
                             this._getZeroBlock(pp, program, !clockwise && isDelta),
                             this._getNonZeroBlock(pp, program)
-                        )
+                        );
                         if (block == this.interpretedProgram.startBlock) {
                             block.steps = steps.slice(1);
                         } else {
@@ -843,11 +869,22 @@ Interpreter.prototype._buildBlock = function(block, clockwise, program) {
             }
         } while (ins == Instruction.TURN);
 
-        steps.push(pp);
+        if (!steps.find(x => x.equals(pp))) {
+            steps.push(pp);
+        } else {
+            // We encountered a (no-data) hang loop
+            block.finalizeHang(
+                numSteps,
+                this._getZeroBlock(pp, program, clockwise),
+                this._getNonZeroBlock(pp, program, !clockwise)
+            );
+            block.steps = steps;
+            return;
+        }
         pp = ip;
     } while (numSteps++ < 128);
 
-    block.finalizeHang();
+    log.error("Failed to finalize block in time");
 }
 
 
@@ -942,11 +979,6 @@ Computer.prototype._fastStep = function() {
     if (!this.programBlock.finalized) {
         console.log("Encountered non-finalized instruction");
         this.status = ERROR;
-        return false;
-    }
-
-    if (this.programBlock.isHang()) {
-        this.status = Status.HANG;
         return false;
     }
 
