@@ -1462,7 +1462,7 @@ CursorControl.prototype._handleClickEvent = function(event) {
 /**
  * @constructor
  */
-function ComputerControl(model) {
+function ComputerControl(model, iniRunSpeed) {
     this.model = model;
     this.programViewer = new ProgramViewer(model);
     this.dataViewer = new DataViewer(model.data);
@@ -1470,7 +1470,7 @@ function ComputerControl(model) {
     this.paused = true;
     this.numUpdatesSinceLastPlay = 0;
 
-    this._setRunSpeed(4);
+    this._setRunSpeed(iniRunSpeed ?? 4);
     document.getElementById("speed-slider").value = this.runSpeed;
 
     const me = this;
@@ -1591,10 +1591,6 @@ ComputerControl.prototype._setRunSpeed = function(speed) {
     console.info(`period = ${this.playPeriod}, stepsPerTick = ${this.stepsPerPlay}`);
 }
 
-ComputerControl.prototype.changeRunSpeed = function(delta) {
-    this._setRunSpeed(Math.min(maxRunSpeed, Math.max(0, this.runSpeed + delta)));
-}
-
 ComputerControl.prototype.updateRunSpeed = function() {
     this._setRunSpeed(document.getElementById("speed-slider").value);
 }
@@ -1631,11 +1627,10 @@ function init() {
         }
     }
 
-    program.dump();
-
     var computer = new Computer(100000, program);
 
-    return new ComputerControl(computer);
+    const iniRunSpeed = urlParams.get('speed');
+    return new ComputerControl(computer, iniRunSpeed);
 }
 
 // In case URLSearchParams function does not exist (e.g. Edge browsers), provide custom one.
