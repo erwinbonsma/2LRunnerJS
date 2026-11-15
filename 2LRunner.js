@@ -466,7 +466,7 @@ function loadProgramFromWebString(programString) {
     var size = Math.round(Math.sqrt(programString.length));
 
     if (size * size != programString.length) {
-        console.log("Web programs must be square");
+        console.warn("Web programs must be square");
         return;
     }
 
@@ -924,7 +924,7 @@ Computer.prototype.reset = function() {
 
 Computer.prototype.rebuild = function() {
     this.interpretedProgram = this.interpreter.buildProgram(this.program);
-    console.log(this.interpretedProgram.toString());
+    // console.log(this.interpretedProgram.toString());
 }
 
 Computer.prototype.getProgramPointer = function() {
@@ -1577,6 +1577,17 @@ ComputerControl.prototype.pause = function() {
     this.paused = true;
 }
 
+ComputerControl.prototype.togglePlay = function() {
+    const status = this.model.status;
+    if (status != Status.READY && status != Status.RUNNING) {
+        this.reset();
+    } else if (this.paused) {
+        this.play();
+    } else {
+        this.pause();
+    }
+}
+
 ComputerControl.prototype._setRunSpeed = function(speed) {
     this.runSpeed = speed;
 
@@ -1661,4 +1672,5 @@ ComputerControl.prototype["play"] = ComputerControl.prototype.play;
 ComputerControl.prototype["edit"] = ComputerControl.prototype.edit;
 ComputerControl.prototype["pause"] = ComputerControl.prototype.pause;
 ComputerControl.prototype["reset"] = ComputerControl.prototype.reset;
+ComputerControl.prototype["togglePlay"] = ComputerControl.prototype.togglePlay;
 ComputerControl.prototype["updateRunSpeed"] = ComputerControl.prototype.updateRunSpeed;
